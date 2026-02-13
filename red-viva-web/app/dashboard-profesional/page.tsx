@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 /* ========= TIPOS (usa los tuyos si ya existen) ========= */
@@ -16,20 +16,39 @@ type Caso = {
   nombre: string;
   edad: number;
   programa: string;
-  estado: string;
+  estado: string; // "alerta" | "estable" | etc
 };
 
 type Actuacion = {
   id: number;
   fecha: string;
-  rol: string;
+  rol: RolProfesional;
   descripcion: string;
+};
+
+/**
+ * Ajusta este tipo si ya sabes las columnas exactas.
+ * - id suele ser uuid (string) o number, por eso lo dejamos flexible.
+ * - created_at suele venir como string ISO.
+ * - dejamos un "colchón" [key: string] para columnas adicionales.
+ */
+type ReporteCuidador = {
+  id: string | number;
+  created_at: string;
+
+  adulto_id?: string | null;
+  cuidador_id?: string | null;
+
+  estado_animo?: string | null;
+  notas?: string | null;
+
+  [key: string]: unknown;
 };
 
 /* ========= COMPONENTE ========= */
 export default function DashboardProfesional() {
   /* ---------- ESTADOS ---------- */
-  const [rolActivo, setRolActivo] = useState<RolProfesional>("Gerontología");
+  const [rolActivo] = useState<RolProfesional>("Gerontología");
 
   const [casos, setCasos] = useState<Caso[]>([]);
   const [casoSeleccionado, setCasoSeleccionado] = useState<Caso | null>(null);
@@ -37,7 +56,18 @@ export default function DashboardProfesional() {
   const [actuaciones, setActuaciones] = useState<Actuacion[]>([]);
   const [textoActuacion, setTextoActuacion] = useState("");
 
-  const [reportes, setReportes] = useState<Record<string, unknown>[]>([]);
+  const [reportes, setReportes] = useState<ReporteCuidador[]>([]);
+
+  /* ---------- EFECTO: (OPCIONAL) CARGAR CASOS MOCK PARA VER UI ---------- */
+  useEffect(() => {
+    // Si ya cargas casos desde BD, elimina este bloque.
+    // Si NO lo tienes aún, esto evita que `casos` esté vacío siempre.
+    setCasos([
+      { id: 1, nombre: "María Pérez", edad: 78, programa: "Día a Día", estado: "estable" },
+      { id: 2, nombre: "Carlos Gómez", edad: 82, programa: "Acompañamiento", estado: "alerta" },
+      { id: 3, nombre: "Ana Rodríguez", edad: 75, programa: "Prevención", estado: "info" },
+    ]);
+  }, []);
 
   /* ---------- EFECTO: LEER REPORTES DESDE SUPABASE ---------- */
   useEffect(() => {
@@ -49,16 +79,19 @@ export default function DashboardProfesional() {
 
       if (error) {
         console.error("❌ Error cargando reportes:", error);
-      } else {
-        console.log("✅ Reportes desde Supabase:", data);
-        setReportes(data || []);
+        return;
       }
+
+      // Tipado seguro sin any
+      const filas = (data ?? []) as ReporteCuidador[];
+      console.log("✅ Reportes desde Supabase:", filas);
+      setReportes(filas);
     };
 
     fetchReportes();
   }, []);
 
-  /* ---------- FUNCIONES AUXILIARES (mock / existentes) ---------- */
+  /* ---------- FUNCIONES AUXILIARES ---------- */
   const iconoEstado = (estado: string) => {
     if (estado === "alerta") return "⚠️";
     if (estado === "estable") return "✅";
@@ -70,53 +103,61 @@ export default function DashboardProfesional() {
   };
 
   const registrarActuacion = () => {
-    if (!textoActuacion || !casoSeleccionado) return;
+    if (!textoActuacion.trim() || !casoSeleccionado) return;
 
     const nueva: Actuacion = {
       id: Date.now(),
       fecha: new Date().toLocaleString(),
       rol: rolActivo,
-      descripcion: textoActuacion,
+      descripcion: textoActuacion.trim(),
     };
 
     setActuaciones((prev) => [...prev, nueva]);
     setTextoActuacion("");
   };
 
+  // Si luego quieres filtrar por caso (adulto_id), aquí lo haces.
   const actuacionesDelCaso = actuaciones;
+
+  const formatearFecha = (iso: string) => {
+    // Si viene null/undefined, protegemos:
+    if (!iso) return "—";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString();
+  };
 
   /* ---------- UI ---------- */
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <main className="grid grid-cols-12 gap-6">
-
         {/* LISTA DE ADULTOS MAYORES */}
         <section className="col-span-3 bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-700 mb-4">
-            Adultos Mayores
-          </h2>
+          <h2 className="font-semibold text-slate-700 mb-4">Adultos Mayores</h2>
 
           <ul className="space-y-2 text-sm">
             {casos.map((caso) => (
               <li
                 key={caso.id}
                 onClick={() => setCasoSeleccionado(caso)}
-                className={`p-2 rounded-lg cursor-pointer ${casoSeleccionado?.id === caso.id
-                    ? "bg-blue-100"
-                    : "hover:bg-slate-100"
-                  }`}
+                className={[
+                  "p-2 rounded-lg cursor-pointer",
+                  casoSeleccionado?.id === caso.id ? "bg-blue-100" : "hover:bg-slate-100",
+                ].join(" ")}
               >
                 {iconoEstado(caso.estado)} {caso.nombre}
               </li>
             ))}
           </ul>
+
+          {casos.length === 0 && (
+            <p className="text-sm text-slate-500 mt-3">Aún no hay casos cargados.</p>
+          )}
         </section>
 
         {/* DETALLE DEL CASO */}
         <section className="col-span-6 bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold text-slate-700 mb-4">
-            Detalle del caso
-          </h2>
+          <h2 className="font-semibold text-slate-700 mb-4">Detalle del caso</h2>
 
           {!casoSeleccionado ? (
             <p className="text-sm text-slate-500">
@@ -124,11 +165,16 @@ export default function DashboardProfesional() {
             </p>
           ) : (
             <div className="space-y-3 text-sm">
-
               <div className="bg-slate-50 rounded-lg p-4 mb-4">
-                <p><strong>Nombre:</strong> {casoSeleccionado.nombre}</p>
-                <p><strong>Edad:</strong> {casoSeleccionado.edad} años</p>
-                <p><strong>Programa:</strong> {casoSeleccionado.programa}</p>
+                <p>
+                  <strong>Nombre:</strong> {casoSeleccionado.nombre}
+                </p>
+                <p>
+                  <strong>Edad:</strong> {casoSeleccionado.edad} años
+                </p>
+                <p>
+                  <strong>Programa:</strong> {casoSeleccionado.programa}
+                </p>
               </div>
 
               <div className="mt-6 bg-slate-50 border rounded-xl p-4">
@@ -142,9 +188,7 @@ export default function DashboardProfesional() {
               </div>
 
               <div className="mt-6">
-                <h3 className="font-semibold mb-2">
-                  Registro de actuación
-                </h3>
+                <h3 className="font-semibold mb-2">Registro de actuación</h3>
 
                 <textarea
                   value={textoActuacion}
@@ -171,9 +215,7 @@ export default function DashboardProfesional() {
           {!casoSeleccionado ? (
             <p className="text-sm text-slate-500">Selecciona un caso.</p>
           ) : actuacionesDelCaso.length === 0 ? (
-            <p className="text-sm text-slate-500">
-              No hay actuaciones registradas.
-            </p>
+            <p className="text-sm text-slate-500">No hay actuaciones registradas.</p>
           ) : (
             <ul className="space-y-3 text-sm">
               {actuacionesDelCaso.map((a) => (
@@ -184,6 +226,38 @@ export default function DashboardProfesional() {
                   <p className="text-xs text-slate-500">{a.fecha}</p>
                   <p className="font-semibold">{a.rol}</p>
                   <p>{a.descripcion}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+
+        {/* ÚLTIMOS REPORTES (para que reportes NO quede unused y se vea en UI) */}
+        <section className="col-span-12 bg-white rounded-xl p-4 shadow-sm">
+          <h2 className="font-semibold text-slate-700 mb-2">Últimos reportes</h2>
+
+          {reportes.length === 0 ? (
+            <p className="text-sm text-slate-500">Aún no hay reportes.</p>
+          ) : (
+            <ul className="text-sm space-y-2">
+              {reportes.slice(0, 8).map((r) => (
+                <li key={String(r.id)} className="border rounded-lg p-3">
+                  <div className="text-xs text-slate-500">
+                    {formatearFecha(String(r.created_at))}
+                  </div>
+
+                  <div className="text-slate-700 mt-1">
+                    <span className="font-semibold">Notas:</span>{" "}
+                    {String(r.notas ?? "— sin notas —")}
+                  </div>
+
+                  {/* Si quieres mostrar más campos */}
+                  {r.estado_animo != null && (
+                    <div className="text-slate-700 mt-1">
+                      <span className="font-semibold">Ánimo:</span>{" "}
+                      {String(r.estado_animo)}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
