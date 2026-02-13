@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+
+<html class="light" lang="es"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Dashboard Profesional - Cuidador</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#0db9f2",
+                        "background-light": "#f5f8f8",
+                        "background-dark": "#101e22",
+                    },
+                    fontFamily: {
+                        "display": ["Inter"]
+                    },
+                    borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+                },
+            },
+        }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background-light dark:bg-background-dark text-[#0d181c] dark:text-white transition-colors duration-200">
+<!-- Top Navigation Bar -->
+<header class="sticky top-0 z-50 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-[#cee2e8] dark:border-white/10">
+<div class="flex items-center p-4 justify-between max-w-md mx-auto">
+<div class="flex size-10 shrink-0 items-center">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 border-2 border-primary" data-alt="Professional profile picture of a female caregiver" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuA7Qco-8RbWvFrod80O1wA4vt7gagP1g4GyYhPa97zO0fssfBY4uIeCfhJUFkyNthpQec9IV2PstSe5mDPPEdasOFV5KSojWRYB7WP-Nm1jabAM1W_9qGX02KTfONVzX2u5aJZwA4ZQkkdaWjOz9aTeVBAJ3wkcxr7C39MbKg36fxEJH1vE9KYRhxqmIUl8eqtbSuiXOj8tSJRyXaC9PwQ5DMxr83PFyRMaxIt2rAGLelOE4XAJ2eFy5agcqTiTASHdsOKm4AKF");'>
+</div>
+</div>
+<div class="flex-1 px-3">
+<h1 class="text-[#0d181c] dark:text-white text-lg font-bold leading-tight tracking-tight">Dashboard Profesional</h1>
+</div>
+<div class="flex items-center gap-2">
+<button class="flex size-10 items-center justify-center rounded-full hover:bg-gray-200 dark:hover:bg-white/10 transition-colors">
+<span class="material-symbols-outlined text-[#0d181c] dark:text-white">notifications</span>
+</button>
+</div>
+</div>
+</header>
+<main class="max-w-md mx-auto pb-24">
+<!-- Greeting Section -->
+<section class="px-4 pt-6 pb-2">
+<h2 class="text-[#0d181c] dark:text-white text-2xl font-bold font-display">Hola, Elena 👋</h2>
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-base font-normal mt-1">Aquí tienes el resumen para hoy.</p>
+</section>
+<!-- Stats Grid -->
+<section class="p-4 grid grid-cols-2 gap-3">
+<div class="col-span-2 flex flex-col gap-2 rounded-xl p-5 border border-[#cee2e8] dark:border-white/10 bg-white dark:bg-[#1a2b30] shadow-sm">
+<div class="flex justify-between items-start">
+<div>
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-sm font-medium uppercase tracking-wider">Reportes hoy</p>
+<p class="text-[#0d181c] dark:text-white tracking-tighter text-4xl font-bold mt-1">12</p>
+</div>
+<div class="bg-primary/10 p-2 rounded-lg">
+<span class="material-symbols-outlined text-primary">analytics</span>
+</div>
+</div>
+<div class="flex items-center gap-1 mt-2">
+<span class="material-symbols-outlined text-[#078836] text-sm">trending_up</span>
+<p class="text-[#078836] text-sm font-semibold">+15% vs ayer</p>
+</div>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 border border-red-100 dark:border-red-900/30 bg-red-50 dark:bg-red-900/10">
+<div class="flex justify-between items-start">
+<p class="text-red-700 dark:text-red-400 text-sm font-medium">Alertas</p>
+<span class="material-symbols-outlined text-red-600 dark:text-red-400">warning</span>
+</div>
+<p class="text-red-900 dark:text-red-100 text-2xl font-bold">2</p>
+<p class="text-red-600/80 dark:text-red-400/80 text-xs font-bold uppercase">Críticas</p>
+</div>
+<div class="flex flex-col gap-2 rounded-xl p-5 border border-[#cee2e8] dark:border-white/10 bg-white dark:bg-[#1a2b30]">
+<div class="flex justify-between items-start">
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-sm font-medium">Activos</p>
+<span class="material-symbols-outlined text-primary">groups</span>
+</div>
+<p class="text-[#0d181c] dark:text-white text-2xl font-bold">8</p>
+<p class="text-[#078836] text-xs font-bold uppercase">Estable</p>
+</div>
+</section>
+<!-- Quick Actions Header -->
+<section class="px-4 pt-4 pb-2 flex items-center justify-between">
+<h2 class="text-[#0d181c] dark:text-white text-xl font-bold leading-tight font-display tracking-tight">Últimos reportes</h2>
+<button class="text-primary text-sm font-semibold">Ver todos</button>
+</section>
+<!-- List Section -->
+<section class="flex flex-col">
+<!-- Item 1 -->
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-white dark:hover:bg-white/5 transition-colors border-b border-[#cee2e8]/50 dark:border-white/5">
+<div class="relative">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-14 w-14 border border-gray-100" data-alt="Elderly woman with gray hair smiling" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDgaVu6OaUpzF4mqdjYSAKd6pPvnF0WPm0ugSUGsQLghedbmc-bXvnvCaSkN8SpL8T9adrRbdWkIOtQwmVa1CZmbd0qARvXTNBU84wpoVID2waM2nux0HmSu2WKKXYZW0cYCgbRHIQFWRpMgBSXGmdxyIeZlH8PrVuM6e7fWa66hxB9mxkCeZA7-HWcFIuOeAeqkq4smG1sDZt3H0z7aYJsp4HZtVXZII4SDQVXFjTEypQmliku91UCCP-7hty3u7lf3VkAk4vi");'>
+</div>
+<div class="absolute bottom-0 right-0 size-4 bg-[#078836] rounded-full border-2 border-background-light dark:border-background-dark"></div>
+</div>
+<div class="flex flex-col flex-1">
+<p class="text-[#0d181c] dark:text-white text-base font-bold leading-tight">Carmen González</p>
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-sm font-normal mt-0.5">Medicamento administrado</p>
+</div>
+<div class="shrink-0 text-right">
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-xs font-medium">5 min</p>
+<span class="material-symbols-outlined text-gray-300 dark:text-gray-600 text-lg">chevron_right</span>
+</div>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-white dark:hover:bg-white/5 transition-colors border-b border-[#cee2e8]/50 dark:border-white/5">
+<div class="relative">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-14 w-14 border border-gray-100" data-alt="Elderly man with glasses wearing a blue sweater" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuDVIIz_s1_rzTRB1t9atiX9eXDNzhCjyVVy_1wyqIP6OKuilWcZlIejsgWffI4-g_a8Np2sbhlftFO8glZUGZqrP1QEfUgbyia7N4aJHWutXnZLBW8Y3tlhgtdKVlVzaQMaWCrv3h6b8Cnfb-3zqKJ1j0OTPuIX4CIOIpAk4YDfLFwVrFTteb812LVpSgzRTialAwn_UQBZFAUieqOnkQOuoubJT3sO43OUqj4YUYwgtXZLT60ag9HIQeW_qscZqGqkLUeSCh5e");'>
+</div>
+<div class="absolute bottom-0 right-0 size-4 bg-orange-500 rounded-full border-2 border-background-light dark:border-background-dark"></div>
+</div>
+<div class="flex flex-col flex-1">
+<p class="text-[#0d181c] dark:text-white text-base font-bold leading-tight">Roberto Mendez</p>
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-sm font-normal mt-0.5">Control de presión arterial</p>
+</div>
+<div class="shrink-0 text-right">
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-xs font-medium">18 min</p>
+<span class="material-symbols-outlined text-gray-300 dark:text-gray-600 text-lg">chevron_right</span>
+</div>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-white dark:hover:bg-white/5 transition-colors border-b border-[#cee2e8]/50 dark:border-white/5">
+<div class="relative">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-14 w-14 border border-gray-100" data-alt="Elderly woman with white hair and glasses" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuB36R-wu0jT9O4WSoxNmm91l-5TaSASzTSMVTcTbZCgtO_nKDD6x_zF1Eb4Ps0cUpcwZgk_gT8YvLJFXC8eGpIkNoxKk6uRlhaV6E4qeHEoCWcGN3wKRM21NZIVHNcEDLU_afKh6DfXGjXTDJ8gC6X7N4rOX9CSdeudD0U9IAsgD5_vuoSFcaxlKMXLGr2UOhUMwGtpdG5NMyuSnESkSTxFA3EqLylRzqATSQXsA6TDcuZfuERLfRvgm7UIzo7BcTSZF-4Dj6Ic");'>
+</div>
+<div class="absolute bottom-0 right-0 size-4 bg-[#078836] rounded-full border-2 border-background-light dark:border-background-dark"></div>
+</div>
+<div class="flex flex-col flex-1">
+<p class="text-[#0d181c] dark:text-white text-base font-bold leading-tight">Elena Ruiz</p>
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-sm font-normal mt-0.5">Sesión de fisioterapia completada</p>
+</div>
+<div class="shrink-0 text-right">
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-xs font-medium">1 h</p>
+<span class="material-symbols-outlined text-gray-300 dark:text-gray-600 text-lg">chevron_right</span>
+</div>
+</div>
+<!-- Item 4 -->
+<div class="flex items-center gap-4 px-4 py-4 hover:bg-white dark:hover:bg-white/5 transition-colors">
+<div class="relative">
+<div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full h-14 w-14 border border-gray-100" data-alt="Elderly man with beard and a hat" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBuHIG20bdTLPjxLBjpY_z9XLiXLSjYHUuD4UqWu-Cpa06QG0YrNdpWcyudItWI8Z2hkfYuFMayCLHZMqeP28QitBAoYYeyYzi1qs7BrfQ7YgG1MpyEbnoaeyC4TomTOSU7Zx8BuvtdPSt5b-_bGz4uOLzAr4P9R7GL4DYHZREGdfOqcEQJziu-AtzPPjsqRDSauA5Z3yYy93qnzYzp1SEFKq0jJ0AMUHE1jFVRGsdcEprAvTPcbmSfzUwh3r0RAtCnXeB7zezT");'>
+</div>
+<div class="absolute bottom-0 right-0 size-4 bg-[#078836] rounded-full border-2 border-background-light dark:border-background-dark"></div>
+</div>
+<div class="flex flex-col flex-1">
+<p class="text-[#0d181c] dark:text-white text-base font-bold leading-tight">Joaquín Soto</p>
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-sm font-normal mt-0.5">Ingesta de líquidos registrada</p>
+</div>
+<div class="shrink-0 text-right">
+<p class="text-[#49879c] dark:text-[#9bbcc9] text-xs font-medium">2 h</p>
+<span class="material-symbols-outlined text-gray-300 dark:text-gray-600 text-lg">chevron_right</span>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Action Button -->
+<button class="fixed right-6 bottom-24 bg-primary text-white size-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-transform active:scale-95 z-50">
+<span class="material-symbols-outlined text-3xl">add</span>
+</button>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-background-dark/90 backdrop-blur-lg border-t border-[#cee2e8] dark:border-white/10 px-6 py-2 pb-8 z-50">
+<div class="flex justify-between items-center max-w-md mx-auto">
+<button class="flex flex-col items-center gap-1 text-primary">
+<span class="material-symbols-outlined font-bold">home</span>
+<span class="text-[10px] font-bold">Inicio</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-gray-400 dark:text-gray-500">
+<span class="material-symbols-outlined">person_search</span>
+<span class="text-[10px] font-medium">Pacientes</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-gray-400 dark:text-gray-500">
+<span class="material-symbols-outlined">edit_document</span>
+<span class="text-[10px] font-medium">Reportes</span>
+</button>
+<button class="flex flex-col items-center gap-1 text-gray-400 dark:text-gray-500">
+<span class="material-symbols-outlined">settings</span>
+<span class="text-[10px] font-medium">Ajustes</span>
+</button>
+</div>
+</nav>
+</body></html>

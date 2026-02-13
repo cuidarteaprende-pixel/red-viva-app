@@ -1,44 +1,74 @@
-import React from 'react';
+"use client";
 
-export default function DashboardRedViva() {
+import Link from "next/link";
+
+export default function HomeRedViva() {
   return (
-    <div className="min-h-screen bg-slate-50 p-8 font-sans">
-      {/* Cabecera */}
-      <header className="mb-10 flex justify-between items-center">
-        <div>
-          <h1 className="text-4xl font-extrabold text-blue-900">Red Viva</h1>
-          <p className="text-slate-500">Acompañamiento Inteligente para Adultos Mayores</p>
-        </div>
-        <div className="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-medium">
-          Estado: Monitoreando
-        </div>
-      </header>
+    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center px-6">
+      <div className="max-w-3xl w-full text-center bg-white rounded-3xl shadow-xl p-10">
 
-      {/* Tarjetas Principales */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-700">Próxima Actividad</h2>
-          <p className="text-3xl font-bold text-blue-600 mt-2">Caminata 10 AM</p>
-        </div>
-        
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-700">Estado de Ánimo</h2>
-          <p className="text-3xl font-bold text-green-600 mt-2">Excelente</p>
+        {/* LOGO */}
+        <div className="flex items-center mb-6">
+  <img
+    src="/red-viva-logo.png"
+    alt="Red Viva"
+    className="h-36 w-auto"
+  />
+</div>
+
+        {/* TITULO */}
+       <h1 className="text-4xl font-extrabold text-blue-900 mb-3">
+  Red Viva
+</h1>
+
+<p className="text-slate-700 mb-4 text-lg">
+  Sistema de apoyo al cuidado y seguimiento de personas mayores
+</p>
+
+<p className="text-slate-500 text-sm">
+  Red Viva conecta el reporte diario de cuidadores con la revisión profesional,
+  integrando tecnología de apoyo y criterios éticos para una atención responsable.
+</p>
+
+        {/* ACCESOS */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
+
+          {/* CUIDADOR */}
+          <Link
+            href="/reporte-cuidador"
+            className="block border rounded-2xl p-6 hover:shadow-lg transition"
+          >
+            <h2 className="text-xl font-semibold text-green-700 mb-2">
+              👩‍⚕️ Reporte Diario del Cuidador
+            </h2>
+            <p className="text-sm text-slate-600">
+              Espacio para registrar observaciones diarias sobre el estado del adulto mayor.
+  No requiere lenguaje técnico ni toma de decisiones.
+            </p>
+          </Link>
+
+          {/* PROFESIONAL */}
+          <Link
+            href="/dashboard-profesional"
+            className="block border rounded-2xl p-6 hover:shadow-lg transition"
+          >
+            <h2 className="text-xl font-semibold text-blue-700 mb-2">
+              🧑‍⚕️ Dashboard Profesional
+            </h2>
+            <p className="text-sm text-slate-600">
+              Espacio para la revisión de casos, validación profesional interdisciplinaria
+  y registro de actuaciones con trazabilidad.
+            </p>
+          </Link>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-semibold text-slate-700">Alertas</h2>
-          <p className="text-3xl font-bold text-red-500 mt-2">0</p>
-        </div>
+        {/* PIE */}
+        <p className="mt-10 text-xs text-slate-400">
+          La información es gestionada según el rol del usuario.
+  La tecnología no reemplaza el criterio humano..
+        </p>
+
       </div>
-
-      {/* Sección de la IA (Trituradora) */}
-      <div className="mt-10 bg-blue-900 text-white p-8 rounded-3xl shadow-xl">
-        <h2 className="text-2xl font-bold mb-4">Registro de Acompañamiento</h2>
-        <div className="bg-blue-800 p-4 rounded-xl italic">
-          "Aquí aparecerá el resumen procesado por la IA de Red Viva..."
-        </div>
-      </div>
-    </div>
+    </main>
   );
 }
