@@ -37,7 +37,7 @@ export default function DashboardProfesional() {
   const [actuaciones, setActuaciones] = useState<Actuacion[]>([]);
   const [textoActuacion, setTextoActuacion] = useState("");
 
-  const [reportes, setReportes] = useState<any[]>([]);
+  const [reportes, setReportes] = useState<Record<string, unknown>[]>([]);
 
   /* ---------- EFECTO: LEER REPORTES DESDE SUPABASE ---------- */
   useEffect(() => {
