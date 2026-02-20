@@ -1,269 +1,393 @@
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/lib/supabase";
+import React, { useMemo, useState } from "react";
+import {
+  Users,
+  AlertTriangle,
+  Search,
+  Filter,
+  ArrowRight,
+  TrendingUp,
+  Activity,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  Bell,
+  Clock,
+} from "lucide-react";
+import Link from "next/link";
+import { cn } from "@/lib/utils";
 
-/* ========= TIPOS (usa los tuyos si ya existen) ========= */
-type RolProfesional =
-  | "Gerontología"
-  | "Psicología"
-  | "Fisioterapia"
-  | "Enfermería"
-  | "Trabajo Social";
+// Tipos basados en "Las 6 Piezas"
+type EstadoPaciente = "estable" | "seguimiento" | "alerta";
+type FiltroEstado = "todos" | EstadoPaciente;
 
-type Caso = {
-  id: number;
+type AdultoMayor = {
+  id: string;
   nombre: string;
   edad: number;
   programa: string;
-  estado: string; // "alerta" | "estable" | etc
+  estado: EstadoPaciente;
+  ultimaActualizacion: string;
 };
 
-type Actuacion = {
-  id: number;
-  fecha: string;
-  rol: RolProfesional;
-  descripcion: string;
-};
+const DEMO_PACIENTES: AdultoMayor[] = [
+  {
+    id: "1",
+    nombre: "Mercedes Valencia",
+    edad: 84,
+    programa: "Centro Día",
+    estado: "estable",
+    ultimaActualizacion: "Hoy, 10:24 AM",
+  },
+  {
+    id: "2",
+    nombre: "Arturo Calle",
+    edad: 79,
+    programa: "Acompañamiento",
+    estado: "alerta",
+    ultimaActualizacion: "Hoy, 08:30 AM",
+  },
+  {
+    id: "3",
+    nombre: "Elena Restrepo",
+    edad: 92,
+    programa: "Cuidado Hogar",
+    estado: "seguimiento",
+    ultimaActualizacion: "Ayer, 06:15 PM",
+  },
+  {
+    id: "4",
+    nombre: "Gustavo Petro",
+    edad: 72,
+    programa: "Centro Día",
+    estado: "estable",
+    ultimaActualizacion: "Hoy, 11:00 AM",
+  },
+  {
+    id: "5",
+    nombre: "Sofía Martínez",
+    edad: 88,
+    programa: "Prevención",
+    estado: "alerta",
+    ultimaActualizacion: "Hoy, 07:12 AM",
+  },
+];
 
-/**
- * Ajusta este tipo si ya sabes las columnas exactas.
- * - id suele ser uuid (string) o number, por eso lo dejamos flexible.
- * - created_at suele venir como string ISO.
- * - dejamos un "colchón" [key: string] para columnas adicionales.
- */
-type ReporteCuidador = {
-  id: string | number;
-  created_at: string;
-
-  adulto_id?: string | null;
-  cuidador_id?: string | null;
-
-  estado_animo?: string | null;
-  notas?: string | null;
-
-  [key: string]: unknown;
-};
-
-/* ========= COMPONENTE ========= */
 export default function DashboardProfesional() {
-  /* ---------- ESTADOS ---------- */
-  const [rolActivo] = useState<RolProfesional>("Gerontología");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filter, setFilter] = useState<FiltroEstado>("todos");
 
-  const [casos, setCasos] = useState<Caso[]>([]);
-  const [casoSeleccionado, setCasoSeleccionado] = useState<Caso | null>(null);
+  const filteredPacientes = useMemo(() => {
+    const term = searchTerm.toLowerCase().trim();
+    return DEMO_PACIENTES.filter((p) => {
+      const matchSearch =
+        p.nombre.toLowerCase().includes(term) ||
+        p.programa.toLowerCase().includes(term);
+      const matchFilter = filter === "todos" || p.estado === filter;
+      return matchSearch && matchFilter;
+    });
+  }, [searchTerm, filter]);
 
-  const [actuaciones, setActuaciones] = useState<Actuacion[]>([]);
-  const [textoActuacion, setTextoActuacion] = useState("");
+  // ✅ Sin useMemo para evitar warnings por dependencias “missing”
+  const total = DEMO_PACIENTES.length;
+  const alertas = DEMO_PACIENTES.filter((p) => p.estado === "alerta").length;
 
-  const [reportes, setReportes] = useState<ReporteCuidador[]>([]);
-
-  /* ---------- EFECTO: (OPCIONAL) CARGAR CASOS MOCK PARA VER UI ---------- */
-  useEffect(() => {
-    // Si ya cargas casos desde BD, elimina este bloque.
-    // Si NO lo tienes aún, esto evita que `casos` esté vacío siempre.
-    setCasos([
-      { id: 1, nombre: "María Pérez", edad: 78, programa: "Día a Día", estado: "estable" },
-      { id: 2, nombre: "Carlos Gómez", edad: 82, programa: "Acompañamiento", estado: "alerta" },
-      { id: 3, nombre: "Ana Rodríguez", edad: 75, programa: "Prevención", estado: "info" },
-    ]);
-  }, []);
-
-  /* ---------- EFECTO: LEER REPORTES DESDE SUPABASE ---------- */
-  useEffect(() => {
-    const fetchReportes = async () => {
-      const { data, error } = await supabase
-        .from("reportes_cuidador")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) {
-        console.error("❌ Error cargando reportes:", error);
-        return;
-      }
-
-      // Tipado seguro sin any
-      const filas = (data ?? []) as ReporteCuidador[];
-      console.log("✅ Reportes desde Supabase:", filas);
-      setReportes(filas);
-    };
-
-    fetchReportes();
-  }, []);
-
-  /* ---------- FUNCIONES AUXILIARES ---------- */
-  const iconoEstado = (estado: string) => {
-    if (estado === "alerta") return "⚠️";
-    if (estado === "estable") return "✅";
-    return "ℹ️";
-  };
-
-  const generarResumenIA = (caso: Caso) => {
-    return `Resumen automático del caso de ${caso.nombre}.`;
-  };
-
-  const registrarActuacion = () => {
-    if (!textoActuacion.trim() || !casoSeleccionado) return;
-
-    const nueva: Actuacion = {
-      id: Date.now(),
-      fecha: new Date().toLocaleString(),
-      rol: rolActivo,
-      descripcion: textoActuacion.trim(),
-    };
-
-    setActuaciones((prev) => [...prev, nueva]);
-    setTextoActuacion("");
-  };
-
-  // Si luego quieres filtrar por caso (adulto_id), aquí lo haces.
-  const actuacionesDelCaso = actuaciones;
-
-  const formatearFecha = (iso: string) => {
-    // Si viene null/undefined, protegemos:
-    if (!iso) return "—";
-    const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return String(iso);
-    return d.toLocaleString();
-  };
-
-  /* ---------- UI ---------- */
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
-      <main className="grid grid-cols-12 gap-6">
-        {/* LISTA DE ADULTOS MAYORES */}
-        <section className="col-span-3 bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-700 mb-4">Adultos Mayores</h2>
+    <div className="min-h-screen bg-[#F0F7FF] flex flex-col selection:bg-primary/20 relative overflow-hidden">
+      {/* Background Decorative Image - Professional with tablet */}
+      <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
+        <img
+          src="https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=1920"
+          alt="Professional care"
+          className="w-full h-full object-cover"
+        />
+      </div>
 
-          <ul className="space-y-2 text-sm">
-            {casos.map((caso) => (
-              <li
-                key={caso.id}
-                onClick={() => setCasoSeleccionado(caso)}
-                className={[
-                  "p-2 rounded-lg cursor-pointer",
-                  casoSeleccionado?.id === caso.id ? "bg-blue-100" : "hover:bg-slate-100",
-                ].join(" ")}
-              >
-                {iconoEstado(caso.estado)} {caso.nombre}
-              </li>
-            ))}
-          </ul>
+      <div className="flex h-full flex-1 overflow-hidden">
+        {/* Navigation Rail */}
+        <nav className="w-20 md:w-24 bg-white border-r border-slate-100 flex flex-col items-center py-8 gap-8 z-20">
+          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 active:scale-95 transition-transform cursor-pointer">
+            <LayoutDashboard className="w-6 h-6" />
+          </div>
 
-          {casos.length === 0 && (
-            <p className="text-sm text-slate-500 mt-3">Aún no hay casos cargados.</p>
-          )}
-        </section>
+          <div className="space-y-6 flex-1">
+            <NavItem icon={<Users className="w-6 h-6" />} active={false} />
+            <NavItem
+              icon={<Bell className="w-6 h-6" />}
+              active={false}
+              badge={alertas}
+            />
+            <NavItem icon={<TrendingUp className="w-6 h-6" />} active={false} />
+          </div>
 
-        {/* DETALLE DEL CASO */}
-        <section className="col-span-6 bg-white rounded-xl p-6 shadow-sm">
-          <h2 className="font-semibold text-slate-700 mb-4">Detalle del caso</h2>
+          <Link
+            href="/"
+            className="p-4 text-slate-400 hover:text-rose-500 transition-colors"
+          >
+            <LogOut className="w-6 h-6" />
+          </Link>
+        </nav>
 
-          {!casoSeleccionado ? (
-            <p className="text-sm text-slate-500">
-              Selecciona un adulto mayor para ver la información.
-            </p>
-          ) : (
-            <div className="space-y-3 text-sm">
-              <div className="bg-slate-50 rounded-lg p-4 mb-4">
-                <p>
-                  <strong>Nombre:</strong> {casoSeleccionado.nombre}
-                </p>
-                <p>
-                  <strong>Edad:</strong> {casoSeleccionado.edad} años
-                </p>
-                <p>
-                  <strong>Programa:</strong> {casoSeleccionado.programa}
-                </p>
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 md:p-10 space-y-10">
+          {/* Header */}
+          <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                Análisis Interdisciplinario
+              </h1>
+              <p className="text-slate-500 font-medium">
+                Panel de control y seguimiento de adultos mayores.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              <div className="bg-white px-4 py-2 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-3">
+                <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Sistema Online
+                </span>
               </div>
 
-              <div className="mt-6 bg-slate-50 border rounded-xl p-4">
-                <h3 className="font-semibold text-slate-700 mb-2">
-                  Resumen generado por IA
-                </h3>
-
-                <p className="text-sm text-slate-700">
-                  {generarResumenIA(casoSeleccionado)}
-                </p>
-              </div>
-
-              <div className="mt-6">
-                <h3 className="font-semibold mb-2">Registro de actuación</h3>
-
-                <textarea
-                  value={textoActuacion}
-                  onChange={(e) => setTextoActuacion(e.target.value)}
-                  className="w-full border rounded-lg p-2 text-sm"
-                  placeholder="Describe la actuación realizada..."
+              <div className="h-12 w-12 rounded-full border-2 border-white shadow-md overflow-hidden bg-slate-200">
+                <img
+                  src="https://api.dicebear.com/7.x/avataaars/svg?seed=Felix"
+                  alt="User"
                 />
-
-                <button
-                  onClick={registrarActuacion}
-                  className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
-                >
-                  Guardar actuación
-                </button>
               </div>
             </div>
-          )}
-        </section>
+          </header>
 
-        {/* BITÁCORA */}
-        <section className="col-span-3 bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-700 mb-4">Bitácora</h2>
+          {/* Stats Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <KpiCard
+              label="Adultos en Seguimiento"
+              value={total}
+              icon={<Users className="w-5 h-5" />}
+              color="blue"
+              trend="+2 este mes"
+            />
+            <KpiCard
+              label="Alertas Activas"
+              value={alertas}
+              icon={<AlertTriangle className="w-5 h-5" />}
+              color="rose"
+              trend="Requieren atención"
+            />
+            <KpiCard
+              label="Actuaciones Hoy"
+              value={12}
+              icon={<Activity className="w-5 h-5" />}
+              color="emerald"
+              trend="Trazabilidad 100%"
+            />
+          </div>
 
-          {!casoSeleccionado ? (
-            <p className="text-sm text-slate-500">Selecciona un caso.</p>
-          ) : actuacionesDelCaso.length === 0 ? (
-            <p className="text-sm text-slate-500">No hay actuaciones registradas.</p>
-          ) : (
-            <ul className="space-y-3 text-sm">
-              {actuacionesDelCaso.map((a) => (
-                <li
-                  key={a.id}
-                  className="pl-3 py-2 rounded-lg border-l-4 border-blue-600"
-                >
-                  <p className="text-xs text-slate-500">{a.fecha}</p>
-                  <p className="font-semibold">{a.rol}</p>
-                  <p>{a.descripcion}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          {/* Table / List Controls */}
+          <div className="bg-white rounded-[2.5rem] shadow-2xl shadow-slate-200/50 border border-slate-100 overflow-hidden">
+            <div className="p-8 border-b border-slate-50 flex flex-col md:flex-row justify-between gap-6">
+              <div className="flex-1 relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300" />
+                <input
+                  type="text"
+                  placeholder="Buscar por nombre o programa..."
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl pl-12 pr-6 py-4 text-sm font-medium outline-none focus:ring-4 focus:ring-primary/5 transition-all"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
 
-        {/* ÚLTIMOS REPORTES (para que reportes NO quede unused y se vea en UI) */}
-        <section className="col-span-12 bg-white rounded-xl p-4 shadow-sm">
-          <h2 className="font-semibold text-slate-700 mb-2">Últimos reportes</h2>
-
-          {reportes.length === 0 ? (
-            <p className="text-sm text-slate-500">Aún no hay reportes.</p>
-          ) : (
-            <ul className="text-sm space-y-2">
-              {reportes.slice(0, 8).map((r) => (
-                <li key={String(r.id)} className="border rounded-lg p-3">
-                  <div className="text-xs text-slate-500">
-                    {formatearFecha(String(r.created_at))}
-                  </div>
-
-                  <div className="text-slate-700 mt-1">
-                    <span className="font-semibold">Notas:</span>{" "}
-                    {String(r.notas ?? "— sin notas —")}
-                  </div>
-
-                  {/* Si quieres mostrar más campos */}
-                  {r.estado_animo != null && (
-                    <div className="text-slate-700 mt-1">
-                      <span className="font-semibold">Ánimo:</span>{" "}
-                      {String(r.estado_animo)}
-                    </div>
+              <div className="flex items-center gap-4">
+                <Filter className="w-4 h-4 text-slate-400" />
+                <div className="flex bg-slate-50 p-1 rounded-2xl">
+                  {(["todos", "estable", "seguimiento", "alerta"] as FiltroEstado[]).map(
+                    (f) => (
+                      <button
+                        key={f}
+                        onClick={() => setFilter(f)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all",
+                          filter === f
+                            ? "bg-white text-primary shadow-sm"
+                            : "text-slate-400 hover:text-slate-600"
+                        )}
+                      >
+                        {f}
+                      </button>
+                    )
                   )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </main>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50">
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Adulto Mayor
+                    </th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Programa
+                    </th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Estado
+                    </th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      Monitorización
+                    </th>
+                    <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-slate-400 text-right">
+                      Acciones
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody className="divide-y divide-slate-50">
+                  {filteredPacientes.map((p) => (
+                    <tr
+                      key={p.id}
+                      className="hover:bg-slate-50/50 transition-colors group"
+                    >
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400">
+                            {p.nombre[0]}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900">{p.nombre}</p>
+                            <p className="text-xs text-slate-500 font-medium">
+                              {p.edad} años
+                            </p>
+                          </div>
+                        </div>
+                      </td>
+
+                      <td className="px-8 py-6">
+                        <span className="text-xs font-bold text-slate-500">
+                          {p.programa}
+                        </span>
+                      </td>
+
+                      <td className="px-8 py-6">
+                        <StatusPill status={p.estado} />
+                      </td>
+
+                      <td className="px-8 py-6">
+                        <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
+                          <Clock className="w-3 h-3" />
+                          {p.ultimaActualizacion}
+                        </div>
+                      </td>
+
+                      <td className="px-8 py-6 text-right">
+                        <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary active:scale-95 transition-all">
+                          Ver Detalle
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+
+              {filteredPacientes.length === 0 && (
+                <div className="p-20 text-center">
+                  <Heart className="w-12 h-12 text-slate-200 mx-auto mb-4" />
+                  <p className="text-slate-400 font-medium">
+                    No se encontraron pacientes registrados.
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
     </div>
+  );
+}
+
+function NavItem({
+  icon,
+  active,
+  badge,
+}: {
+  icon: React.ReactNode;
+  active: boolean;
+  badge?: number;
+}) {
+  return (
+    <div
+      className={cn(
+        "relative p-4 rounded-2xl cursor-pointer transition-all active:scale-90",
+        active ? "text-primary" : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
+      )}
+    >
+      {icon}
+      {!!badge && badge > 0 && (
+        <span className="absolute top-2 right-2 w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center border-2 border-white">
+          {badge}
+        </span>
+      )}
+    </div>
+  );
+}
+
+function KpiCard({
+  label,
+  value,
+  icon,
+  color,
+  trend,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  color: "blue" | "rose" | "emerald";
+  trend: string;
+}) {
+  const colors: Record<"blue" | "rose" | "emerald", string> = {
+    blue: "text-blue-600 bg-blue-50 border-blue-100",
+    rose: "text-rose-600 bg-rose-50 border-rose-100",
+    emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
+  };
+
+  return (
+    <div className="bg-white p-8 rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 space-y-4 transition-transform hover:scale-[1.02]">
+      <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center border", colors[color])}>
+        {icon}
+      </div>
+      <div>
+        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1">
+          {label}
+        </p>
+        <p className="text-3xl font-black text-slate-900 tracking-tight">{value}</p>
+      </div>
+      <div className="pt-4 border-t border-slate-50 text-[10px] font-bold text-slate-400 flex items-center gap-2">
+        {color === "rose" && <AlertTriangle className="w-3 h-3 text-rose-500" />}
+        {trend}
+      </div>
+    </div>
+  );
+}
+
+function StatusPill({ status }: { status: AdultoMayor["estado"] }) {
+  const styles: Record<EstadoPaciente, string> = {
+    estable: "bg-emerald-50 text-emerald-600 border-emerald-100",
+    seguimiento: "bg-blue-50 text-blue-600 border-blue-100",
+    alerta: "bg-rose-50 text-rose-600 border-rose-100",
+  };
+
+  return (
+    <span
+      className={cn(
+        "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border",
+        styles[status]
+      )}
+    >
+      {status}
+    </span>
   );
 }

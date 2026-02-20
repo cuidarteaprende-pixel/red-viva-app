@@ -1,74 +1,167 @@
+/* eslint-disable @next/next/no-img-element */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import Link from "next/link";
+import { motion } from "framer-motion";
+import { Heart, ShieldCheck, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-export default function HomeRedViva() {
+export default function Home() {
   return (
-    <main className="min-h-screen bg-gradient-to-b from-slate-50 to-slate-100 flex items-center justify-center px-6">
-      <div className="max-w-3xl w-full text-center bg-white rounded-3xl shadow-xl p-10">
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 selection:bg-primary/20 relative overflow-hidden">
+      {/* Background radial gradient for depth */}
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-from),_transparent_40%)] from-primary/5 pointer-events-none" />
 
-        {/* LOGO */}
-        <div className="flex items-center mb-6">
-  <img
-    src="/red-viva-logo.png"
-    alt="Red Viva"
-    className="h-36 w-auto"
-  />
-</div>
+      <div className="w-full max-w-6xl space-y-12 z-10">
+        {/* Header with Logo */}
+        <header className="w-full flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
+          <div className="flex flex-col items-start gap-4">
+            <img
+              src="/red-viva-logo.png"
+              alt="Red Viva"
+              style={{ height: '280px', width: 'auto' }}
+              className="drop-shadow-[0_20px_50px_rgba(37,99,235,0.2)] object-contain -ml-4"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  const fallback = document.createElement('div');
+                  fallback.className = 'text-7xl font-black text-blue-900 flex items-center gap-2 mb-4';
+                  fallback.innerHTML = '<span>Red Viva</span>';
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+            <span className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-blue-100 border border-blue-200 text-xs font-black text-blue-700 uppercase tracking-[0.2em] shadow-sm ml-4">
+              Tecnología para la Vida
+            </span>
+          </div>
+        </header>
 
-        {/* TITULO */}
-       <h1 className="text-4xl font-extrabold text-blue-900 mb-3">
-  Red Viva
-</h1>
-
-<p className="text-slate-700 mb-4 text-lg">
-  Sistema de apoyo al cuidado y seguimiento de personas mayores
-</p>
-
-<p className="text-slate-500 text-sm">
-  Red Viva conecta el reporte diario de cuidadores con la revisión profesional,
-  integrando tecnología de apoyo y criterios éticos para una atención responsable.
-</p>
-
-        {/* ACCESOS */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-10">
-
-          {/* CUIDADOR */}
-          <Link
-            href="/reporte-cuidador"
-            className="block border rounded-2xl p-6 hover:shadow-lg transition"
-          >
-            <h2 className="text-xl font-semibold text-green-700 mb-2">
-              👩‍⚕️ Reporte Diario del Cuidador
-            </h2>
-            <p className="text-sm text-slate-600">
-              Espacio para registrar observaciones diarias sobre el estado del adulto mayor.
-  No requiere lenguaje técnico ni toma de decisiones.
-            </p>
-          </Link>
-
-          {/* PROFESIONAL */}
-          <Link
-            href="/dashboard-profesional"
-            className="block border rounded-2xl p-6 hover:shadow-lg transition"
-          >
-            <h2 className="text-xl font-semibold text-blue-700 mb-2">
-              🧑‍⚕️ Dashboard Profesional
-            </h2>
-            <p className="text-sm text-slate-600">
-              Espacio para la revisión de casos, validación profesional interdisciplinaria
-  y registro de actuaciones con trazabilidad.
-            </p>
-          </Link>
+        {/* Hero Section */}
+        <div className="text-center md:text-left max-w-3xl">
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-none mb-6">
+            Cuidado ético con <span className="text-primary italic">propósito.</span>
+          </h1>
+          <p className="text-xl text-slate-500 font-medium leading-relaxed">
+            Bienvenido al ecosistema Red Viva. Seleccione su portal para continuar con el seguimiento interdisciplinario de calidad.
+          </p>
         </div>
 
-        {/* PIE */}
-        <p className="mt-10 text-xs text-slate-400">
-          La información es gestionada según el rol del usuario.
-  La tecnología no reemplaza el criterio humano..
-        </p>
+        {/* Roles Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Card Cuidador */}
+          <RoleCard
+            href="/cuidador"
+            title="Portal Cuidador"
+            subtitle="Registrar Reporte Diario"
+            description="Bitácora 360°, registro de signos vitales, alimentación y avisos de eventos críticos."
+            icon={<Heart className="w-8 h-8 text-rose-500" />}
+            image="https://images.pexels.com/photos/3791664/pexels-photo-3791664.jpeg?auto=compress&cs=tinysrgb&w=1200"
+            color="rose"
+          />
 
+          {/* Card Profesional */}
+          <RoleCard
+            href="/dashboard-profesional"
+            title="Portal Profesional"
+            subtitle="Análisis y Gestión Interdisciplinaria"
+            description="Dashboard clínico, KPIs en tiempo real, validación de casos y trazabilidad ética."
+            icon={<ShieldCheck className="w-8 h-8 text-blue-600" />}
+            image="https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=1200"
+            color="blue"
+          />
+        </div>
+
+        {/* Footer */}
+        <footer className="pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+          <span>&copy; {new Date().getFullYear()} Red Viva • Todos los derechos reservados</span>
+          <div className="flex gap-6">
+            <span className="text-slate-900">WCAG AA Compliant</span>
+            <span className="text-slate-900">Blockchain Traceability</span>
+          </div>
+        </footer>
       </div>
-    </main>
+    </div>
+  );
+}
+
+function RoleCard({ href, title, subtitle,
+  description,
+  icon,
+  image,
+  color
+}: {
+  href: string;
+  title: string;
+  subtitle: string;
+  description: string;
+  icon: React.ReactNode;
+  image: string;
+  color: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className={cn(
+        "group relative block h-full min-h-[400px] rounded-[2.5rem] bg-white border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl active:scale-[0.99] focus-visible:ring-4 focus-visible:ring-primary/20 outline-none"
+      )}
+    >
+      {/* Background Image with Overlay */}
+      <div className="absolute inset-0 z-0">
+        <img
+          src={image}
+          alt={title}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110 opacity-70"
+          onError={(e) => {
+            // Fallback to gradient if image not found
+            e.currentTarget.style.display = 'none';
+            const parent = e.currentTarget.parentElement;
+            if (parent) {
+              parent.className += color === 'rose' ? " bg-gradient-to-br from-rose-100 to-white" : " bg-gradient-to-br from-blue-100 to-white";
+            }
+          }}
+        />
+        <div className={cn(
+          "absolute inset-0 bg-gradient-to-t from-white via-white/5 to-transparent",
+          "opacity-30"
+        )} />
+      </div>
+
+      <div className="relative z-10 p-10 flex flex-col h-full">
+        <div className={cn(
+          "w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-lg transition-transform group-hover:scale-110",
+          color === 'rose' ? "bg-white text-rose-500" : "bg-white text-blue-600"
+        )}>
+          {icon}
+        </div>
+
+        <div className="mt-auto">
+          <span className={cn(
+            "text-[10px] font-black uppercase tracking-widest mb-2 block",
+            color === 'rose' ? "text-rose-600" : "text-blue-600"
+          )}>
+            {subtitle}
+          </span>
+          <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tight leading-tight">
+            {title}
+          </h2>
+          <p className="text-slate-500 font-medium text-lg leading-relaxed mb-8 max-w-sm">
+            {description}
+          </p>
+          <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-900 group-hover:gap-4 transition-all">
+            Ingresar Ahora
+            <ArrowRight className="w-4 h-4" />
+          </div>
+        </div>
+      </div>
+
+      {/* Subtle bottom line */}
+      <div className={cn(
+        "absolute bottom-0 left-0 right-0 h-2",
+        color === 'rose' ? "bg-rose-500" : "bg-blue-600"
+      )} />
+    </Link>
   );
 }

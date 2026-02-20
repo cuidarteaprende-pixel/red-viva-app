@@ -34,7 +34,7 @@ export default function CuidadorLogin() {
     };
 
     return (
-        <div className="min-h-screen bg-[#020617] flex items-center justify-center p-6 relative overflow-hidden">
+        <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden">
             {/* Background elements */}
             <div className="absolute inset-0 z-0">
                 <img
@@ -87,16 +87,16 @@ export default function CuidadorLogin() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-primary py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4 text-white disabled:opacity-50 disabled:hover:scale-100"
+                        className="w-full bg-primary py-4 rounded-2xl font-bold shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all mt-4 text-white disabled:opacity-50 disabled:hover:scale-100 btn-premium"
                     >
                         {loading ? "Iniciando sesión..." : "Ingresar"}
                     </button>
                 </form>
 
                 <div className="mt-8 text-center border-t border-white/5 pt-8">
-                    <Link href="/" className="text-slate-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2">
+                    <Link href="/gateway" className="text-slate-500 hover:text-white transition-colors text-xs font-bold uppercase tracking-widest flex items-center justify-center gap-2 interactive">
                         <span className="material-symbols-rounded text-sm">arrow_back</span>
-                        Volver al inicio
+                        Volver
                     </Link>
                 </div>
 

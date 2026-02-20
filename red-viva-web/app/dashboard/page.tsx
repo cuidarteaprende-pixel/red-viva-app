@@ -1,9 +1,5 @@
-import DashboardProfesional from '@/components/DashboardProfesional';
+import { redirect } from 'next/navigation';
 
 export default function DashboardPage() {
-    return (
-        <main>
-            <DashboardProfesional />
-        </main>
-    );
+    redirect('/dashboard-profesional');
 }
