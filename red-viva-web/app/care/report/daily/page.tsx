@@ -1,15 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
 /**
- * Tipos base (sin any)
+ * Tipos base
  */
-type Severity = "baja" | "media" | "alta";
-
 type StepKey =
   | "salud_fisica"
   | "movilidad"
@@ -20,14 +18,14 @@ type StepKey =
   | "cognicion_emocional"
   | "entorno_cuidador";
 
-type StepData = Record<string, unknown>; // campos internos por esfera
-
+type StepData = Record<string, unknown>;
 type Respuestas = Record<StepKey, StepData>;
 
 type FormData = {
-  fechaHora: string; // ISO string
+  fechaHora: string; // ISO local string para UI
   respuestas: Respuestas;
-  observaciones: string;
+  observaciones: string; // Observaciones finales (solo una vez)
+  notaGeneral: string; // Nota corta general (solo una vez)
 };
 
 type StepDef = {
@@ -36,14 +34,21 @@ type StepDef = {
   subtitle: string;
 };
 
+type StepGroup = {
+  title: string;
+  subtitle: string;
+  keys: StepKey[];
+};
+
 /**
  * Helpers
  */
 function nowIsoLocal(): string {
-  // ISO local (sin Z) para UI; si prefieres ISO completo con Z, usa new Date().toISOString()
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
 }
 
 function ensureRespuestas(): Respuestas {
@@ -62,52 +67,192 @@ function ensureRespuestas(): Respuestas {
 export default function DailyReportPage() {
   const router = useRouter();
 
-  // 🔧 Ajusta si tú ya traes adultoId y caregiver desde otro lado (context, params, etc.)
-  // TODO: Reemplaza por tu lógica real de identificación:
-  const [adultoId] = useState<string | null>(null);
-  const [caregiverId] = useState<string | null>(null);
+  // ✅ Demo mode controlado por env var (client-safe)
+  const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-  const steps: StepDef[] = useMemo(
-    () => [
-      {
+  const [adultoId, setAdultoId] = useState<string | null>(null);
+  const [caregiverId, setCaregiverId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch session and default IDs on mount
+  useEffect(() => {
+    let cancelled = false;
+
+    async function setIdsSafe(next: { cuidador?: string | null; adulto?: string | null }) {
+      if (cancelled) return;
+      if (typeof next.cuidador !== "undefined") setCaregiverId(next.cuidador ?? null);
+      if (typeof next.adulto !== "undefined") setAdultoId(next.adulto ?? null);
+    }
+
+    async function loadIdsForLoggedUser(authUserId: string) {
+      // 1) caregiver id
+      const { data: cg, error: cgErr } = await supabase
+        .from("cuidadores")
+        .select("id")
+        .eq("auth_user_id", authUserId)
+        .maybeSingle();
+
+      if (cgErr) console.error("[SESSION] caregiver lookup error", cgErr);
+
+      const cgId = cg?.id ?? null;
+      await setIdsSafe({ cuidador: cgId });
+
+      if (!cgId) return;
+
+      // 2) assigned adult
+      const { data: assignments, error: asErr } = await supabase
+        .from("asignaciones_cuidado")
+        .select("adulto_id")
+        .eq("cuidador_id", cgId)
+        .limit(1);
+
+      if (asErr) console.error("[SESSION] assignments error", asErr);
+
+      if (assignments && assignments.length > 0) {
+        await setIdsSafe({ adulto: assignments[0].adulto_id as string });
+        return;
+      }
+
+      // 3) fallback any adult
+      const { data: anyAdult, error: adErr } = await supabase
+        .from("adultos_mayores")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+
+      if (adErr) console.error("[SESSION] anyAdult error", adErr);
+      await setIdsSafe({ adulto: anyAdult?.id ?? null });
+    }
+
+    async function loadIdsForDemo() {
+      console.warn("[DEMO_MODE] Sin sesión. Cargando perfiles de prueba.");
+
+      const { data: fallbackCg, error: cgErr } = await supabase
+        .from("cuidadores")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+
+      if (cgErr) console.error("[DEMO_MODE] caregiver error", cgErr);
+
+      const { data: fallbackAm, error: amErr } = await supabase
+        .from("adultos_mayores")
+        .select("id")
+        .limit(1)
+        .maybeSingle();
+
+      if (amErr) console.error("[DEMO_MODE] adulto error", amErr);
+
+      await setIdsSafe({
+        cuidador: fallbackCg?.id ?? null,
+        adulto: fallbackAm?.id ?? null,
+      });
+
+      toast.info("Modo Demo activo", {
+        description: "No se detectó sesión. Se usarán perfiles de prueba para permitir guardar.",
+      });
+    }
+
+    async function loadSession() {
+      try {
+        const {
+          data: { session },
+          error: sessErr,
+        } = await supabase.auth.getSession();
+
+        if (sessErr) console.error("[SESSION] getSession error", sessErr);
+
+        if (session?.user?.id) {
+          await loadIdsForLoggedUser(session.user.id);
+        } else if (DEMO_MODE) {
+          await loadIdsForDemo();
+        } else {
+          toast.error("Sesión no detectada", {
+            description: "Debes iniciar sesión para guardar el reporte.",
+          });
+        }
+      } catch (err) {
+        console.error("Error loading session data:", err);
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    loadSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [DEMO_MODE]);
+
+  /**
+   * Definición por sección
+   */
+  const stepsByKey: Record<StepKey, StepDef> = useMemo(
+    () => ({
+      salud_fisica: {
         key: "salud_fisica",
         title: "Salud física y signos",
         subtitle: "Chequeo simple (dolor, fiebre, respiración, energía).",
       },
-      {
+      movilidad: {
         key: "movilidad",
         title: "Movilidad y riesgo de caídas",
         subtitle: "Marcha, equilibrio, caídas o casi caídas.",
       },
-      {
+      nutricion: {
         key: "nutricion",
         title: "Nutrición e hidratación",
         subtitle: "Comidas, líquidos, evacuación y señales de deshidratación.",
       },
-      {
+      medicacion: {
         key: "medicacion",
         title: "Medicación",
         subtitle: "Adherencia, olvidos y efectos secundarios.",
       },
-      {
+      higiene_piel: {
         key: "higiene_piel",
         title: "Higiene, piel e incontinencia",
         subtitle: "Integridad de piel, lesiones y cuidado personal.",
       },
-      {
+      sueno: {
         key: "sueno",
         title: "Sueño y descanso",
         subtitle: "Calidad del sueño, despertares y agitación nocturna.",
       },
-      {
+      cognicion_emocional: {
         key: "cognicion_emocional",
         title: "Cognición y estado emocional",
         subtitle: "Orientación, confusión y estado de ánimo.",
       },
-      {
+      entorno_cuidador: {
         key: "entorno_cuidador",
         title: "Entorno + social + cuidador",
         subtitle: "Riesgos en casa, interacción social y carga del cuidador.",
+      },
+    }),
+    []
+  );
+
+  /**
+   * ✅ 3 pasos (grupos)
+   */
+  const stepGroups: StepGroup[] = useMemo(
+    () => [
+      {
+        title: "Chequeo físico",
+        subtitle: "Salud, movilidad y nutrición",
+        keys: ["salud_fisica", "movilidad", "nutricion"],
+      },
+      {
+        title: "Rutina y cuidado",
+        subtitle: "Medicación, higiene/piel y sueño",
+        keys: ["medicacion", "higiene_piel", "sueno"],
+      },
+      {
+        title: "Cognición y entorno",
+        subtitle: "Emoción, entorno y cierre",
+        keys: ["cognicion_emocional", "entorno_cuidador"],
       },
     ],
     []
@@ -120,13 +265,14 @@ export default function DailyReportPage() {
     fechaHora: nowIsoLocal(),
     respuestas: ensureRespuestas(),
     observaciones: "",
+    notaGeneral: "",
   });
 
-  const currentStep = steps[stepIndex];
+  const currentGroup = stepGroups[stepIndex];
+  const isLastGroup = stepIndex === stepGroups.length - 1;
 
   /**
-   * ✅ ESTA ES LA FUNCIÓN QUE TE MARCABA EN ROJO
-   * Ahora está bien tipada y no usa any / unknown indexado
+   * Actualizador de respuestas por sección
    */
   const updateStepData = (stepKey: StepKey, field: string, value: unknown) => {
     setFormData((prev) => ({
@@ -144,7 +290,7 @@ export default function DailyReportPage() {
   const handlePrev = () => setStepIndex((i) => Math.max(0, i - 1));
 
   const handleNext = async () => {
-    if (stepIndex < steps.length - 1) {
+    if (stepIndex < stepGroups.length - 1) {
       setStepIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
@@ -153,49 +299,69 @@ export default function DailyReportPage() {
   };
 
   const handleSubmit = async () => {
-    // Validación mínima (ajústala a tu flujo real)
+    console.log("click guardar reporte", { adultoId, caregiverId, DEMO_MODE });
+
     if (!adultoId || !caregiverId) {
-      toast.error("No se identificó el adulto mayor o el cuidador. Inicia sesión nuevamente.");
+      toast.error("No se puede guardar: falta identificar perfil.", {
+        description: DEMO_MODE
+          ? "En modo demo deben cargarse perfiles. Verifica datos en 'cuidadores' y 'adultos_mayores'."
+          : "Debes iniciar sesión para guardar el reporte.",
+      });
       return;
     }
 
     setSaving(true);
 
     try {
+      // ✅ Guardamos TODO en 'notas' (solo existe esa columna)
+      const notasFinales = [
+        formData.notaGeneral?.trim()
+          ? `Nota corta: ${formData.notaGeneral.trim()}`
+          : null,
+        formData.observaciones?.trim()
+          ? `Observaciones: ${formData.observaciones.trim()}`
+          : null,
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+
       const payload = {
         adulto_id: adultoId,
         cuidador_id: caregiverId,
         tipo_reporte: "diario",
-        // OJO: si tu BD espera fecha separada, divídela aquí
-        fecha_hora: new Date(formData.fechaHora).toISOString(),
+        fecha: new Date().toISOString().split("T")[0], // YYYY-MM-DD
         respuestas: formData.respuestas,
-        observaciones: formData.observaciones || null,
+        notas: notasFinales || null,
       };
 
-      // TODO: Ajusta el nombre de la tabla a la que realmente insertas
-      const { error } = await supabase.from("reportes_cuidador").insert(payload);
+      console.log("payload", payload);
+
+      const { data, error } = await supabase.from("reportes_cuidador").insert(payload).select();
+
+      console.log("insert result", { data, error });
 
       if (error) {
-        toast.error("No se pudo guardar el reporte. Revisa conexión o permisos.");
+        console.error("Supabase error:", error);
+        toast.error(`Error al guardar: ${error.message}`);
         return;
       }
 
-      toast.success("Reporte del día guardado correctamente.");
-      router.push("/care/home"); // TODO: ajusta ruta si es distinta
+      toast.success("¡Reporte guardado con éxito!");
+      setTimeout(() => router.push("/cuidador"), 1200);
+    } catch (err) {
+      console.error("Unexpected error:", err);
+      toast.error("Ocurrió un error inesperado al guardar.");
     } finally {
       setSaving(false);
     }
   };
 
   /**
-   * UI de campos (básico y claro)
-   * Puedes reemplazar por tus componentes, pero este compila y sirve.
+   * Campos por sección (mismas preguntas)
    */
   const renderFields = (k: StepKey) => {
-    // helper para leer valores
-    const v = (field: string) => formData.respuestas[k]?.[field];
-
-    // helper para set
+    const v = (field: string) =>
+      (formData.respuestas[k] as Record<string, unknown> | undefined)?.[field];
     const set = (field: string, value: unknown) => updateStepData(k, field, value);
 
     switch (k) {
@@ -230,12 +396,6 @@ export default function DailyReportPage() {
               value={(v("sintomas") as string | undefined) ?? ""}
               onChange={(val) => set("sintomas", val)}
               options={["Ninguno", "Mareo", "Náuseas", "Diarrea", "Estreñimiento", "Otro"]}
-            />
-            <Input
-              label="Nota corta (opcional)"
-              value={(v("nota") as string | undefined) ?? ""}
-              onChange={(val) => set("nota", val)}
-              placeholder="¿Qué notaste?"
             />
           </div>
         );
@@ -272,10 +432,29 @@ export default function DailyReportPage() {
       case "nutricion":
         return (
           <div className="space-y-4">
-            <Select label="Comió" value={(v("comio") as string | undefined) ?? ""} onChange={(val) => set("comio", val)} options={["Bien", "Poco", "Nada"]} />
-            <Select label="Tomó líquidos" value={(v("liquidos") as string | undefined) ?? ""} onChange={(val) => set("liquidos", val)} options={["Bien", "Poco", "Nada"]} />
-            <YesNo label="¿Náuseas o vómito?" value={(v("vomito") as boolean | undefined) ?? null} onChange={(val) => set("vomito", val)} />
-            <Select label="Evacuación" value={(v("evacuacion") as string | undefined) ?? ""} onChange={(val) => set("evacuacion", val)} options={["Normal", "Estreñimiento", "Diarrea", "No hizo"]} />
+            <Select
+              label="Comió"
+              value={(v("comio") as string | undefined) ?? ""}
+              onChange={(val) => set("comio", val)}
+              options={["Bien", "Poco", "Nada"]}
+            />
+            <Select
+              label="Tomó líquidos"
+              value={(v("liquidos") as string | undefined) ?? ""}
+              onChange={(val) => set("liquidos", val)}
+              options={["Bien", "Poco", "Nada"]}
+            />
+            <YesNo
+              label="¿Náuseas o vómito?"
+              value={(v("vomito") as boolean | undefined) ?? null}
+              onChange={(val) => set("vomito", val)}
+            />
+            <Select
+              label="Evacuación"
+              value={(v("evacuacion") as string | undefined) ?? ""}
+              onChange={(val) => set("evacuacion", val)}
+              options={["Normal", "Estreñimiento", "Diarrea", "No hizo"]}
+            />
             <Input
               label="Señales de deshidratación (opcional)"
               value={(v("deshidratacion") as string | undefined) ?? ""}
@@ -294,7 +473,11 @@ export default function DailyReportPage() {
               onChange={(val) => set("adherencia", val)}
               options={["Sí", "Parcial", "No"]}
             />
-            <YesNo label="¿Se olvidó alguna dosis?" value={(v("olvido") as boolean | undefined) ?? null} onChange={(val) => set("olvido", val)} />
+            <YesNo
+              label="¿Se olvidó alguna dosis?"
+              value={(v("olvido") as boolean | undefined) ?? null}
+              onChange={(val) => set("olvido", val)}
+            />
             <Select
               label="¿Efectos secundarios?"
               value={(v("efectos") as string | undefined) ?? ""}
@@ -313,32 +496,98 @@ export default function DailyReportPage() {
       case "higiene_piel":
         return (
           <div className="space-y-4">
-            <Select label="Higiene" value={(v("higiene") as string | undefined) ?? ""} onChange={(val) => set("higiene", val)} options={["Completa", "Parcial", "No se pudo"]} />
-            <Select label="Piel" value={(v("piel") as string | undefined) ?? ""} onChange={(val) => set("piel", val)} options={["🟢 Bien", "🟡 Enrojecida", "🔴 Herida o llaga"]} />
-            <Select label="Incontinencia" value={(v("incontinencia") as string | undefined) ?? ""} onChange={(val) => set("incontinencia", val)} options={["No", "Orina", "Heces", "Ambas"]} />
-            <Input label="Si hay lesión: ubicación (opcional)" value={(v("lesion_ubicacion") as string | undefined) ?? ""} onChange={(val) => set("lesion_ubicacion", val)} placeholder="sacro / talón / cadera / otro" />
+            <Select
+              label="Higiene"
+              value={(v("higiene") as string | undefined) ?? ""}
+              onChange={(val) => set("higiene", val)}
+              options={["Completa", "Parcial", "No se pudo"]}
+            />
+            <Select
+              label="Piel"
+              value={(v("piel") as string | undefined) ?? ""}
+              onChange={(val) => set("piel", val)}
+              options={["🟢 Bien", "🟡 Enrojecida", "🔴 Herida o llaga"]}
+            />
+            <Select
+              label="Incontinencia"
+              value={(v("incontinencia") as string | undefined) ?? ""}
+              onChange={(val) => set("incontinencia", val)}
+              options={["No", "Orina", "Heces", "Ambas"]}
+            />
+            <Input
+              label="Si hay lesión: ubicación (opcional)"
+              value={(v("lesion_ubicacion") as string | undefined) ?? ""}
+              onChange={(val) => set("lesion_ubicacion", val)}
+              placeholder="sacro / talón / cadera / otro"
+            />
           </div>
         );
 
       case "sueno":
         return (
           <div className="space-y-4">
-            <Select label="Durmió" value={(v("durmio") as string | undefined) ?? ""} onChange={(val) => set("durmio", val)} options={["😴 Mal", "🙂 Regular", "😃 Bien"]} />
-            <YesNo label="¿Se despertó muchas veces?" value={(v("despertares") as boolean | undefined) ?? null} onChange={(val) => set("despertares", val)} />
-            <YesNo label="¿Agitación nocturna?" value={(v("agitacion") as boolean | undefined) ?? null} onChange={(val) => set("agitacion", val)} />
-            <Select label="Siestas" value={(v("siestas") as string | undefined) ?? ""} onChange={(val) => set("siestas", val)} options={["No", "Sí (corta)", "Sí (larga)"]} />
+            <Select
+              label="Durmió"
+              value={(v("durmio") as string | undefined) ?? ""}
+              onChange={(val) => set("durmio", val)}
+              options={["😴 Mal", "🙂 Regular", "😃 Bien"]}
+            />
+            <YesNo
+              label="¿Se despertó muchas veces?"
+              value={(v("despertares") as boolean | undefined) ?? null}
+              onChange={(val) => set("despertares", val)}
+            />
+            <YesNo
+              label="¿Agitación nocturna?"
+              value={(v("agitacion") as boolean | undefined) ?? null}
+              onChange={(val) => set("agitacion", val)}
+            />
+            <Select
+              label="Siestas"
+              value={(v("siestas") as string | undefined) ?? ""}
+              onChange={(val) => set("siestas", val)}
+              options={["No", "Sí (corta)", "Sí (larga)"]}
+            />
           </div>
         );
 
       case "cognicion_emocional":
         return (
           <div className="space-y-4">
-            <Select label="¿Estuvo orientado?" value={(v("orientado") as string | undefined) ?? ""} onChange={(val) => set("orientado", val)} options={["Sí", "A veces", "No"]} />
-            <Select label="Memoria hoy" value={(v("memoria") as string | undefined) ?? ""} onChange={(val) => set("memoria", val)} options={["Bien", "Regular", "Mal"]} />
-            <YesNo label="¿Confusión o delirios?" value={(v("confusion") as boolean | undefined) ?? null} onChange={(val) => set("confusion", val)} />
-            <Select label="Ánimo" value={(v("animo") as string | undefined) ?? ""} onChange={(val) => set("animo", val)} options={["😟 Bajo", "😐 Neutro", "🙂 Bueno"]} />
-            <Select label="Ansiedad (1–5)" value={(v("ansiedad") as string | undefined) ?? ""} onChange={(val) => set("ansiedad", val)} options={["1", "2", "3", "4", "5"]} />
-            <YesNo label="¿Irritabilidad/enojo?" value={(v("enojo") as boolean | undefined) ?? null} onChange={(val) => set("enojo", val)} />
+            <Select
+              label="¿Estuvo orientado?"
+              value={(v("orientado") as string | undefined) ?? ""}
+              onChange={(val) => set("orientado", val)}
+              options={["Sí", "A veces", "No"]}
+            />
+            <Select
+              label="Memoria hoy"
+              value={(v("memoria") as string | undefined) ?? ""}
+              onChange={(val) => set("memoria", val)}
+              options={["Bien", "Regular", "Mal"]}
+            />
+            <YesNo
+              label="¿Confusión o delirios?"
+              value={(v("confusion") as boolean | undefined) ?? null}
+              onChange={(val) => set("confusion", val)}
+            />
+            <Select
+              label="Ánimo"
+              value={(v("animo") as string | undefined) ?? ""}
+              onChange={(val) => set("animo", val)}
+              options={["😟 Bajo", "😐 Neutro", "🙂 Bueno"]}
+            />
+            <Select
+              label="Ansiedad (1–5)"
+              value={(v("ansiedad") as string | undefined) ?? ""}
+              onChange={(val) => set("ansiedad", val)}
+              options={["1", "2", "3", "4", "5"]}
+            />
+            <YesNo
+              label="¿Irritabilidad/enojo?"
+              value={(v("enojo") as boolean | undefined) ?? null}
+              onChange={(val) => set("enojo", val)}
+            />
           </div>
         );
 
@@ -351,32 +600,68 @@ export default function DailyReportPage() {
               onChange={(val) => set("riesgos", val)}
               options={["Ninguno", "Piso mojado", "Alfombras", "Mala luz", "Otro"]}
             />
-            <YesNo label="¿Usó ayudas (bastón/caminador)?" value={(v("ayudas") as boolean | undefined) ?? null} onChange={(val) => set("ayudas", val)} />
-            <Select label="¿Interacción social hoy?" value={(v("social") as string | undefined) ?? ""} onChange={(val) => set("social", val)} options={["Sí", "No"]} />
-            <Select label="¿Cómo te sientes tú hoy?" value={(v("cuidador_estado") as string | undefined) ?? ""} onChange={(val) => set("cuidador_estado", val)} options={["😵 Muy cansado", "😐 Normal", "🙂 Bien"]} />
-            <Select label="Estrés (1–5)" value={(v("estres") as string | undefined) ?? ""} onChange={(val) => set("estres", val)} options={["1", "2", "3", "4", "5"]} />
-            <YesNo label="¿Necesitas apoyo?" value={(v("apoyo") as boolean | undefined) ?? null} onChange={(val) => set("apoyo", val)} />
+            <YesNo
+              label="¿Usó ayudas (bastón/caminador)?"
+              value={(v("ayudas") as boolean | undefined) ?? null}
+              onChange={(val) => set("ayudas", val)}
+            />
+            <Select
+              label="¿Interacción social hoy?"
+              value={(v("social") as string | undefined) ?? ""}
+              onChange={(val) => set("social", val)}
+              options={["Sí", "No"]}
+            />
+            <Select
+              label="¿Cómo te sientes tú hoy?"
+              value={(v("cuidador_estado") as string | undefined) ?? ""}
+              onChange={(val) => set("cuidador_estado", val)}
+              options={["😵 Muy cansado", "😐 Normal", "🙂 Bien"]}
+            />
+            <Select
+              label="Estrés (1–5)"
+              value={(v("estres") as string | undefined) ?? ""}
+              onChange={(val) => set("estres", val)}
+              options={["1", "2", "3", "4", "5"]}
+            />
+            <YesNo
+              label="¿Necesitas apoyo?"
+              value={(v("apoyo") as boolean | undefined) ?? null}
+              onChange={(val) => set("apoyo", val)}
+            />
           </div>
         );
     }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
+          <p className="font-bold text-slate-400 uppercase tracking-widest text-xs">
+            Cargando datos del cuidador...
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-3xl px-4 py-6">
         <header className="mb-6">
           <h1 className="text-2xl font-black text-slate-900">Reporte Diario 360°</h1>
-          <p className="text-slate-600">Completa el formulario paso a paso. Toma menos de 3 minutos.</p>
+          <p className="text-slate-600">Completa el formulario. Ahora es más corto y fácil.</p>
         </header>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="flex items-center justify-between gap-4">
             <div>
               <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                Paso {stepIndex + 1} / {steps.length}
+                Paso {stepIndex + 1} / {stepGroups.length}
               </p>
-              <h2 className="text-xl font-black text-slate-900">{currentStep.title}</h2>
-              <p className="text-slate-600 text-sm">{currentStep.subtitle}</p>
+              <h2 className="text-xl font-black text-slate-900">{currentGroup.title}</h2>
+              <p className="text-slate-600 text-sm">{currentGroup.subtitle}</p>
             </div>
           </div>
 
@@ -388,19 +673,36 @@ export default function DailyReportPage() {
               placeholder="YYYY-MM-DDTHH:mm"
             />
 
-            {renderFields(currentStep.key)}
+            {currentGroup.keys.map((k) => (
+              <section key={k} className="mt-4 rounded-3xl border border-slate-100 bg-slate-50/50 p-4">
+                <h3 className="text-base font-black text-slate-900">{stepsByKey[k].title}</h3>
+                <p className="text-sm text-slate-600">{stepsByKey[k].subtitle}</p>
+                <div className="mt-3">{renderFields(k)}</div>
+              </section>
+            ))}
 
-            <div>
-              <label className="block text-sm font-bold text-slate-900 mb-2">
-                Observaciones libres (opcional)
-              </label>
-              <textarea
-                className="w-full min-h-[120px] rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-4 focus:ring-blue-100"
-                placeholder="Cuéntanos con tus palabras qué pasó hoy…"
-                value={formData.observaciones}
-                onChange={(e) => setFormData((p) => ({ ...p, observaciones: e.target.value }))}
-              />
-            </div>
+            {isLastGroup && (
+              <div className="mt-2 grid gap-4">
+                <Input
+                  label="Nota corta general (opcional)"
+                  value={formData.notaGeneral}
+                  onChange={(val) => setFormData((p) => ({ ...p, notaGeneral: val }))}
+                  placeholder="Algo breve y relevante (ej: tuvo un día más tranquilo)"
+                />
+
+                <div>
+                  <label className="block text-sm font-bold text-slate-900 mb-2">
+                    Observaciones libres (opcional)
+                  </label>
+                  <textarea
+                    className="w-full min-h-[120px] rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-4 focus:ring-blue-100"
+                    placeholder="Cuéntanos con tus palabras qué pasó hoy…"
+                    value={formData.observaciones}
+                    onChange={(e) => setFormData((p) => ({ ...p, observaciones: e.target.value }))}
+                  />
+                </div>
+              </div>
+            )}
 
             <div className="mt-2 flex items-center justify-between">
               <button
@@ -418,11 +720,10 @@ export default function DailyReportPage() {
                 disabled={saving}
                 className="rounded-2xl bg-blue-600 px-5 py-3 font-black text-white shadow-sm active:scale-[0.99] disabled:opacity-60"
               >
-                {saving ? "Guardando…" : stepIndex === steps.length - 1 ? "Guardar reporte" : "Siguiente"}
+                {saving ? "Guardando…" : isLastGroup ? "Guardar reporte" : "Siguiente"}
               </button>
             </div>
 
-            {/* Nota UX: Botón rápido a urgencia (mantiene tu flujo de eventos) */}
             <div className="pt-4 border-t border-slate-100">
               <button
                 type="button"
@@ -443,9 +744,8 @@ export default function DailyReportPage() {
 }
 
 /**
- * Componentes UI simples y a prueba de cuidadores (botones grandes, claros)
+ * Componentes UI simples
  */
-
 function Input({
   label,
   value,
@@ -517,7 +817,9 @@ function YesNo({
           type="button"
           onClick={() => onChange(true)}
           className={`flex-1 rounded-2xl px-4 py-3 font-black ${
-            value === true ? "bg-emerald-600 text-white" : "bg-slate-50 border border-slate-200 text-slate-800"
+            value === true
+              ? "bg-emerald-600 text-white"
+              : "bg-slate-50 border border-slate-200 text-slate-800"
           }`}
         >
           Sí
@@ -526,7 +828,9 @@ function YesNo({
           type="button"
           onClick={() => onChange(false)}
           className={`flex-1 rounded-2xl px-4 py-3 font-black ${
-            value === false ? "bg-rose-600 text-white" : "bg-slate-50 border border-slate-200 text-slate-800"
+            value === false
+              ? "bg-rose-600 text-white"
+              : "bg-slate-50 border border-slate-200 text-slate-800"
           }`}
         >
           No
