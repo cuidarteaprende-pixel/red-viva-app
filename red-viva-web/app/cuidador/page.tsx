@@ -1,183 +1,129 @@
-/* eslint-disable @next/next/no-img-element */
-/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React from "react";
-import {
-    Heart,
-    History,
-    Settings,
-    LogOut,
-    ChevronRight,
-    Calendar,
-    AlertCircle,
-    Clock,
-    User,
-    ShieldCheck
-} from "lucide-react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import { Heart, AlertTriangle, ArrowRight } from "lucide-react";
 
-export default function CuidadorPage() {
-    return (
-        <div className="min-h-screen bg-[#F0F7FF] flex flex-col selection:bg-rose-100 relative overflow-hidden">
-            {/* Background Decorative Image */}
-            <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
-                <img
-                    src="https://images.pexels.com/photos/3791664/pexels-photo-3791664.jpeg?auto=compress&cs=tinysrgb&w=1920"
-                    alt="Decorative care"
-                    className="w-full h-full object-cover"
-                />
+export default function ReporteCuidadorPage() {
+  return (
+    <main className="min-h-screen bg-slate-50">
+      {/* Fondo suave para profundidad */}
+      <div className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_55%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,_rgba(239,68,68,0.12),_transparent_55%)]" />
+        <div className="absolute inset-0 pointer-events-none [mask-image:radial-gradient(ellipse_at_center,black,transparent_70%)] bg-white/40" />
+
+        <div className="relative mx-auto max-w-5xl p-6 md:p-10 space-y-8">
+          {/* Header */}
+          <header className="rounded-[2.5rem] border border-slate-200/70 bg-white/75 backdrop-blur-md p-7 md:p-10 shadow-[0_20px_60px_rgba(2,6,23,0.06)]">
+            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-6">
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black text-slate-900 tracking-tight">
+                  Reporte del cuidador
+                </h1>
+                <p className="mt-2 text-slate-600 font-medium">
+                  Desde aquí puedes diligenciar el reporte diario y registrar novedades.
+                </p>
+              </div>
+
+              {/* Chip de guía UX (no cambia contenido, solo ayuda visual) */}
+              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-emerald-700 shadow-sm">
+                <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                Listo para registrar
+              </div>
             </div>
+          </header>
 
-            {/* Top Header */}
-            <header className="bg-white/80 backdrop-blur-md border-b border-slate-100 px-6 py-6 sticky top-0 z-30 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-rose-500 rounded-xl flex items-center justify-center text-white shadow-lg shadow-rose-200">
-                        <ShieldCheck className="w-6 h-6" />
-                    </div>
-                    <div>
-                        <p className="text-sm font-black text-slate-900 leading-none mb-1">Red Viva</p>
-                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Portal Cuidador</p>
-                    </div>
+          {/* Cards */}
+          <section className="grid gap-6 md:grid-cols-2">
+            {/* Reporte diario */}
+            <Link
+              href="/care/report/daily"
+              className="group relative rounded-[2.5rem] border border-slate-200/70 bg-white/75 backdrop-blur-md p-7 md:p-8 shadow-[0_18px_50px_rgba(2,6,23,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(2,6,23,0.10)] focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400/30"
+            >
+              {/* Accento superior */}
+              <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-[2.5rem] bg-gradient-to-r from-emerald-500 to-emerald-600" />
+
+              <div className="flex items-start justify-between gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 border border-emerald-100 flex items-center justify-center shadow-sm">
+                  <Heart className="w-7 h-7 text-emerald-600" />
                 </div>
-                <div className="flex items-center gap-4">
-                    <div className="hidden md:block text-right">
-                        <p className="text-xs font-black text-slate-900">Marta Rodríguez</p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase">Cuidadora Auxiliar</p>
-                    </div>
-                    <div className="w-10 h-10 rounded-full bg-rose-50 border-2 border-white shadow-sm flex items-center justify-center text-rose-500 overflow-hidden">
-                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Marta" alt="Marta" />
-                    </div>
+
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Prioridad diaria
                 </div>
-            </header>
+              </div>
 
-            <main className="flex-1 max-w-4xl mx-auto w-full p-6 space-y-10">
+              <h2 className="mt-6 text-2xl font-black text-slate-900 tracking-tight">
+                Reporte diario
+              </h2>
 
-                {/* Welcome Section */}
-                <section className="space-y-2">
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">Hola, Marta</h1>
-                    <p className="text-slate-500 font-medium">¿Cómo se encuentra hoy la persona a tu cargo?</p>
-                </section>
+              <p className="mt-2 text-slate-600 font-medium leading-relaxed">
+                Registra el estado del adulto mayor (salud, rutina, cognición y entorno).
+              </p>
 
-                {/* Quick Actions */}
-                <section className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <Link
-                        href="/care/report/daily"
-                        className="group relative bg-white p-10 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 hover:scale-[1.02] transition-all overflow-hidden"
-                    >
-                        <div className="relative z-10 flex flex-col h-full">
-                            <div className="w-14 h-14 bg-emerald-50 text-emerald-500 rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                                <Heart className="w-8 h-8" />
-                            </div>
-                            <h2 className="text-2xl font-black text-slate-900 mb-2">Nuevo Reporte</h2>
-                            <p className="text-slate-500 font-medium mb-6">Completa el seguimiento 360° del estado de salud diario.</p>
-                            <div className="mt-auto flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-600 group-hover:gap-4 transition-all">
-                                Registrar Ahora <ChevronRight className="w-4 h-4" />
-                            </div>
-                        </div>
-                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <Calendar className="w-24 h-24 text-slate-900" />
-                        </div>
-                    </Link>
+              <div className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-black text-white shadow-lg shadow-emerald-600/20 transition-all group-hover:gap-4 group-hover:bg-emerald-700">
+                Ir al reporte
+                <ArrowRight className="w-4 h-4" />
+              </div>
 
-                    <Link
-                        href="/reporte-cuidador?tab=evento"
-                        className="group relative bg-white p-10 rounded-[2.5rem] border border-rose-50 shadow-xl shadow-rose-200/20 hover:scale-[1.02] transition-all overflow-hidden"
-                    >
-                        <div className="relative z-10 flex flex-col h-full">
-                            <div className="w-14 h-14 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:scale-110 transition-transform">
-                                <AlertCircle className="w-8 h-8" />
-                            </div>
-                            <h2 className="text-2xl font-black text-slate-900 mb-2">Reportar Evento</h2>
-                            <p className="text-slate-500 font-medium mb-6">Informa caídas, novedades médicas o cambios urgentes.</p>
-                            <div className="mt-auto flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-rose-600 group-hover:gap-4 transition-all">
-                                Registrar Alerta <ChevronRight className="w-4 h-4" />
-                            </div>
-                        </div>
-                        <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                            <AlertCircle className="w-24 h-24 text-rose-900" />
-                        </div>
-                    </Link>
-                </section>
+              {/* sutil decoración */}
+              <div className="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl" />
+            </Link>
 
-                {/* Recent History */}
-                <section className="space-y-6">
-                    <div className="flex items-center justify-between px-2">
-                        <h3 className="text-lg font-black text-slate-900 tracking-tight">Tus Últimos Registros</h3>
-                        <button className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary">Ver historial completo</button>
-                    </div>
+            {/* Evento / novedad */}
+            <a
+              href="/care/report/event"
+              className="group relative rounded-[2.5rem] border border-slate-200/70 bg-white/75 backdrop-blur-md p-7 md:p-8 shadow-[0_18px_50px_rgba(2,6,23,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(2,6,23,0.10)] focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-400/30"
+            >
+              <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-[2.5rem] bg-gradient-to-r from-rose-500 to-rose-600" />
 
-                    <div className="bg-white rounded-[2rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden divide-y divide-slate-50">
-                        <HistoryItem
-                            title="Reporte Diario"
-                            time="Hoy, 08:30 AM"
-                            status="Completado"
-                            color="emerald"
-                        />
-                        <HistoryItem
-                            title="Reporte Diario"
-                            time="Ayer, 08:15 AM"
-                            status="Completado"
-                            color="emerald"
-                        />
-                        <HistoryItem
-                            title="Evento: Cambio de Conducta"
-                            time="12 Feb, 04:20 PM"
-                            status="Visto por Profesional"
-                            color="blue"
-                        />
-                    </div>
-                </section>
+              <div className="flex items-start justify-between gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center shadow-sm">
+                  <AlertTriangle className="w-7 h-7 text-rose-600" />
+                </div>
 
-                {/* Footer Actions */}
-                <section className="flex flex-col md:flex-row gap-4 pt-10 border-t border-white">
-                    <button className="flex-1 py-4 px-8 rounded-2xl bg-white border border-slate-100 text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-900 transition-all flex items-center justify-center gap-3">
-                        <Settings className="w-4 h-4" />
-                        Mi Perfil
-                    </button>
-                    <button
-                        onClick={() => window.location.href = '/'}
-                        className="flex-1 py-4 px-8 rounded-2xl bg-white border border-slate-100 text-xs font-black uppercase tracking-widest text-rose-400 hover:text-rose-600 transition-all flex items-center justify-center gap-3"
-                    >
-                        <LogOut className="w-4 h-4" />
-                        Cerrar Sesión
-                    </button>
-                </section>
+                <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                  Urgente / evento
+                </div>
+              </div>
 
-            </main>
+              <h2 className="mt-6 text-2xl font-black text-slate-900 tracking-tight">
+                Evento / novedad
+              </h2>
 
-            <footer className="bg-white p-10 text-center space-y-4">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-300">Red Viva System • v2.0</p>
-            </footer>
+              <p className="mt-2 text-slate-600 font-medium leading-relaxed">
+                Registra un evento puntual (caída, síntoma agudo, incidente, etc.).
+              </p>
 
+              <div className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/10 transition-all group-hover:gap-4 group-hover:bg-black">
+                Registrar evento
+                <ArrowRight className="w-4 h-4" />
+              </div>
+
+              <p className="mt-3 text-xs text-slate-500">
+                (Si esta ruta aún no existe, puedes ocultar este botón por ahora.)
+              </p>
+
+              <div className="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-rose-500/10 blur-2xl" />
+            </a>
+          </section>
+
+          {/* Notas */}
+          <section className="rounded-[2.5rem] border border-slate-200/70 bg-white/75 backdrop-blur-md p-7 md:p-8 shadow-[0_18px_50px_rgba(2,6,23,0.06)]">
+            <h3 className="text-lg font-black text-slate-900">Notas</h3>
+            <ul className="mt-3 list-disc space-y-2 pl-5 text-sm text-slate-600 font-medium">
+              <li>
+                Si estás en demo, usa el formulario diario y valida que se guarde en
+                <span className="font-black"> reportes_cuidador</span>.
+              </li>
+              <li>
+                Si Vercel vuelve a fallar, revisa el log: normalmente es ESLint por
+                variables/imports no usados.
+              </li>
+            </ul>
+          </section>
         </div>
-    );
-}
-
-function HistoryItem({ title, time, status, color }: { title: string; time: string; status: string; color: string }) {
-    const colors: any = {
-        emerald: "bg-emerald-500",
-        blue: "bg-blue-500",
-        rose: "bg-rose-500"
-    };
-
-    return (
-        <div className="p-6 flex items-center justify-between group hover:bg-slate-50 transition-colors">
-            <div className="flex items-center gap-4">
-                <div className={cn("w-2 h-2 rounded-full", colors[color])} />
-                <div>
-                    <p className="text-sm font-bold text-slate-900">{title}</p>
-                    <div className="flex items-center gap-2 text-xs text-slate-400 font-medium">
-                        <Clock className="w-3 h-3" />
-                        {time}
-                    </div>
-                </div>
-            </div>
-            <div className="flex items-center gap-4">
-                <span className="text-[10px] font-bold text-slate-400">{status}</span>
-                <ChevronRight className="w-4 h-4 text-slate-200 group-hover:text-primary transition-colors" />
-            </div>
-        </div>
-    );
+      </div>
+    </main>
+  );
 }

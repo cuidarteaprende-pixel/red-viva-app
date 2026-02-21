@@ -20,7 +20,6 @@ import {
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
-// Tipos basados en "Las 6 Piezas"
 type EstadoPaciente = "estable" | "seguimiento" | "alerta";
 type FiltroEstado = "todos" | EstadoPaciente;
 
@@ -91,13 +90,11 @@ export default function DashboardProfesional() {
     });
   }, [searchTerm, filter]);
 
-  // ✅ Sin useMemo para evitar warnings por dependencias “missing”
   const total = DEMO_PACIENTES.length;
   const alertas = DEMO_PACIENTES.filter((p) => p.estado === "alerta").length;
 
   return (
     <div className="min-h-screen bg-[#F0F7FF] flex flex-col selection:bg-primary/20 relative overflow-hidden">
-      {/* Background Decorative Image - Professional with tablet */}
       <div className="fixed inset-0 z-0 opacity-20 pointer-events-none">
         <img
           src="https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=1920"
@@ -109,23 +106,31 @@ export default function DashboardProfesional() {
       <div className="flex h-full flex-1 overflow-hidden">
         {/* Navigation Rail */}
         <nav className="w-20 md:w-24 bg-white border-r border-slate-100 flex flex-col items-center py-8 gap-8 z-20">
-          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 active:scale-95 transition-transform cursor-pointer">
+          {/* ✅ Logo: ahora navega al dashboard profesional */}
+          <Link
+            href="/dashboard-profesional"
+            className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center text-white shadow-lg shadow-primary/30 active:scale-95 transition-transform cursor-pointer"
+            aria-label="Ir a Dashboard"
+          >
             <LayoutDashboard className="w-6 h-6" />
-          </div>
+          </Link>
 
+          {/* ✅ Menú con links reales */}
           <div className="space-y-6 flex-1">
-            <NavItem icon={<Users className="w-6 h-6" />} active={false} />
-            <NavItem
+            <NavLink href="/pro/patients" icon={<Users className="w-6 h-6" />} active={true} />
+            <NavLink
+              href="/dashboard-profesional"
               icon={<Bell className="w-6 h-6" />}
               active={false}
               badge={alertas}
             />
-            <NavItem icon={<TrendingUp className="w-6 h-6" />} active={false} />
+            <NavLink href="/pro/dashboard" icon={<TrendingUp className="w-6 h-6" />} active={false} />
           </div>
 
           <Link
             href="/"
             className="p-4 text-slate-400 hover:text-rose-500 transition-colors"
+            aria-label="Salir"
           >
             <LogOut className="w-6 h-6" />
           </Link>
@@ -282,11 +287,15 @@ export default function DashboardProfesional() {
                         </div>
                       </td>
 
+                      {/* ✅ Acciones ahora navegan */}
                       <td className="px-8 py-6 text-right">
-                        <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary active:scale-95 transition-all">
+                        <Link
+                          href={`/pro/patients/${p.id}`}
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-900 text-white text-[10px] font-black uppercase tracking-widest hover:bg-primary active:scale-95 transition-all"
+                        >
                           Ver Detalle
                           <ArrowRight className="w-3 h-3" />
-                        </button>
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -309,21 +318,25 @@ export default function DashboardProfesional() {
   );
 }
 
-function NavItem({
+function NavLink({
+  href,
   icon,
   active,
   badge,
 }: {
+  href: string;
   icon: React.ReactNode;
   active: boolean;
   badge?: number;
 }) {
   return (
-    <div
+    <Link
+      href={href}
       className={cn(
-        "relative p-4 rounded-2xl cursor-pointer transition-all active:scale-90",
+        "relative block p-4 rounded-2xl transition-all active:scale-90",
         active ? "text-primary" : "text-slate-300 hover:text-slate-500 hover:bg-slate-50"
       )}
+      aria-label={`Ir a ${href}`}
     >
       {icon}
       {!!badge && badge > 0 && (
@@ -331,7 +344,7 @@ function NavItem({
           {badge}
         </span>
       )}
-    </div>
+    </Link>
   );
 }
 
