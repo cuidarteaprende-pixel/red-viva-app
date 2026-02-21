@@ -22,10 +22,10 @@ type StepData = Record<string, unknown>;
 type Respuestas = Record<StepKey, StepData>;
 
 type FormData = {
-  fechaHora: string; // ISO local string para UI
+  fechaHora: string;
   respuestas: Respuestas;
-  observaciones: string; // Observaciones finales (solo una vez)
-  notaGeneral: string; // Nota corta general (solo una vez)
+  observaciones: string; // solo al final
+  notaGeneral: string; // solo al final
 };
 
 type StepDef = {
@@ -46,9 +46,9 @@ type StepGroup = {
 function nowIsoLocal(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+    d.getDate()
+  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function ensureRespuestas(): Respuestas {
@@ -64,38 +64,55 @@ function ensureRespuestas(): Respuestas {
   };
 }
 
-// ✅ ID fijo para modo demo (debe existir en tabla cuidadores si hay FK)
 const DEMO_CUIDADOR_ID = "00000000-0000-0000-0000-000000000001";
 
 export default function DailyReportPage() {
   const router = useRouter();
-
   const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   const [adultoId, setAdultoId] = useState<string | null>(null);
+  const [adultoNombre, setAdultoNombre] = useState<string | null>(null);
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Cargar sesión + ids
   useEffect(() => {
     let cancelled = false;
 
-    async function setIdsSafe(next: { cuidador?: string | null; adulto?: string | null }) {
+    async function safeSet(partial: {
+      adultoId?: string | null;
+      caregiverId?: string | null;
+      adultoNombre?: string | null;
+    }) {
       if (cancelled) return;
-      if (typeof next.cuidador !== "undefined") setCaregiverId(next.cuidador ?? null);
-      if (typeof next.adulto !== "undefined") setAdultoId(next.adulto ?? null);
+      if ("adultoId" in partial) setAdultoId(partial.adultoId ?? null);
+      if ("caregiverId" in partial) setCaregiverId(partial.caregiverId ?? null);
+      if ("adultoNombre" in partial) setAdultoNombre(partial.adultoNombre ?? null);
     }
 
-    async function loadIdsForLoggedUser(authUserId: string) {
+    async function fetchAdultName(id: string) {
+      // adultos_mayores aparece UNRESTRICTED en tu Supabase, esto debería funcionar.
+      const { data, error } = await supabase
+        .from("adultos_mayores")
+        .select("nombre")
+        .eq("id", id)
+        .maybeSingle();
+
+      if (error) console.error("[ADULTO] nombre error:", error);
+      return (data?.nombre as string | undefined) ?? null;
+    }
+
+    async function loadForLoggedUser(authUserId: string) {
       const { data: cg, error: cgErr } = await supabase
         .from("cuidadores")
         .select("id")
         .eq("auth_user_id", authUserId)
         .maybeSingle();
 
-      if (cgErr) console.error("[SESSION] caregiver lookup error", cgErr);
+      if (cgErr) console.error("[SESSION] cuidador error:", cgErr);
 
       const cgId = cg?.id ?? null;
-      await setIdsSafe({ cuidador: cgId });
+      await safeSet({ caregiverId: cgId });
 
       if (!cgId) return;
 
@@ -105,73 +122,63 @@ export default function DailyReportPage() {
         .eq("cuidador_id", cgId)
         .limit(1);
 
-      if (asErr) console.error("[SESSION] assignments error", asErr);
+      if (asErr) console.error("[SESSION] asignaciones error:", asErr);
 
-      if (assignments && assignments.length > 0) {
-        await setIdsSafe({ adulto: assignments[0].adulto_id as string });
-        return;
+      const firstAdult = assignments?.[0]?.adulto_id as string | undefined;
+      if (firstAdult) {
+        const name = await fetchAdultName(firstAdult);
+        await safeSet({ adultoId: firstAdult, adultoNombre: name });
       }
-
-      const { data: anyAdult, error: adErr } = await supabase
-        .from("adultos_mayores")
-        .select("id")
-        .limit(1)
-        .maybeSingle();
-
-      if (adErr) console.error("[SESSION] anyAdult error", adErr);
-      await setIdsSafe({ adulto: anyAdult?.id ?? null });
     }
 
-    async function loadIdsForDemo() {
-      console.warn("[DEMO_MODE] Sin sesión. Cargando perfiles de prueba (adulto).");
+    async function loadForDemo() {
+      console.warn("[DEMO_MODE] Sin sesión. Cargando adulto de prueba.");
 
-      // En demo: intentamos leer un adulto para no bloquear el formulario
-      // (si esto falla por RLS, igual lo verás en consola)
-      const { data: fallbackAm, error: amErr } = await supabase
+      const { data: anyAdult, error } = await supabase
         .from("adultos_mayores")
-        .select("id")
+        .select("id, nombre")
         .limit(1)
         .maybeSingle();
 
-      if (amErr) console.error("[DEMO_MODE] adulto error", amErr);
+      if (error) console.error("[DEMO_MODE] adultos_mayores error:", error);
 
-      await setIdsSafe({
-        cuidador: null, // 👈 puede quedar null por RLS, lo manejamos en submit
-        adulto: fallbackAm?.id ?? null,
+      await safeSet({
+        adultoId: (anyAdult?.id as string | undefined) ?? null,
+        adultoNombre: (anyAdult?.nombre as string | undefined) ?? null,
+        caregiverId: null, // puede quedar null; en submit usamos DEMO_CUIDADOR_ID
       });
 
       toast.info("Modo Demo activo", {
-        description:
-          "No se detectó sesión. Se usará cuidador DEMO si no se puede leer cuidador por permisos.",
+        description: "No se detectó sesión. Guardará con cuidador DEMO.",
       });
     }
 
-    async function loadSession() {
+    async function load() {
       try {
         const {
           data: { session },
           error: sessErr,
         } = await supabase.auth.getSession();
 
-        if (sessErr) console.error("[SESSION] getSession error", sessErr);
+        if (sessErr) console.error("[SESSION] getSession error:", sessErr);
 
         if (session?.user?.id) {
-          await loadIdsForLoggedUser(session.user.id);
+          await loadForLoggedUser(session.user.id);
         } else if (DEMO_MODE) {
-          await loadIdsForDemo();
+          await loadForDemo();
         } else {
           toast.error("Sesión no detectada", {
             description: "Debes iniciar sesión para guardar el reporte.",
           });
         }
-      } catch (err) {
-        console.error("Error loading session data:", err);
+      } catch (e) {
+        console.error("Error cargando sesión:", e);
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    loadSession();
+    load();
 
     return () => {
       cancelled = true;
@@ -291,11 +298,11 @@ export default function DailyReportPage() {
   const handleSubmit = async () => {
     console.log("click guardar reporte", { adultoId, caregiverId, DEMO_MODE });
 
-    // ✅ En demo permitimos que caregiverId sea null y usamos DEMO_CUIDADOR_ID
+    // ✅ En demo permitimos caregiverId null
     if (!adultoId || (!caregiverId && !DEMO_MODE)) {
       toast.error("No se puede guardar: falta identificar perfil.", {
         description: DEMO_MODE
-          ? "Falta adultoId. Revisa permisos o datos de adultos_mayores."
+          ? "Falta adultoId. Revisa permisos o datos."
           : "Debes iniciar sesión para guardar el reporte.",
       });
       return;
@@ -307,7 +314,9 @@ export default function DailyReportPage() {
 
     try {
       const notasFinales = [
-        formData.notaGeneral?.trim() ? `Nota corta: ${formData.notaGeneral.trim()}` : null,
+        formData.notaGeneral?.trim()
+          ? `Nota corta: ${formData.notaGeneral.trim()}`
+          : null,
         formData.observaciones?.trim()
           ? `Observaciones: ${formData.observaciones.trim()}`
           : null,
@@ -341,8 +350,10 @@ export default function DailyReportPage() {
         return;
       }
 
-      toast.success("¡Reporte guardado con éxito!");
-      setTimeout(() => router.push("/cuidador"), 1200);
+      // ✅ Redirigir a pantalla "Gracias"
+      const nombre = adultoNombre?.trim() || "";
+      const qs = nombre ? `?adulto=${encodeURIComponent(nombre)}` : "";
+      router.push(`/care/report/daily/success${qs}`);
     } catch (err) {
       console.error("Unexpected error:", err);
       toast.error("Ocurrió un error inesperado al guardar.");
@@ -575,6 +586,9 @@ export default function DailyReportPage() {
               onChange={(val) => set("ansiedad", val)}
               options={["1", "2", "3", "4", "5"]}
             />
+            <p className="text-xs text-slate-500 -mt-2">
+              1 = Nada / tranquilo · 3 = Moderado · 5 = Muy alto
+            </p>
             <YesNo
               label="¿Irritabilidad/enojo?"
               value={(v("enojo") as boolean | undefined) ?? null}
@@ -615,6 +629,9 @@ export default function DailyReportPage() {
               onChange={(val) => set("estres", val)}
               options={["1", "2", "3", "4", "5"]}
             />
+            <p className="text-xs text-slate-500 -mt-2">
+              1 = Bajo · 3 = Medio · 5 = Alto / sobrecarga
+            </p>
             <YesNo
               label="¿Necesitas apoyo?"
               value={(v("apoyo") as boolean | undefined) ?? null}
@@ -666,7 +683,10 @@ export default function DailyReportPage() {
             />
 
             {currentGroup.keys.map((k) => (
-              <section key={k} className="mt-4 rounded-3xl border border-slate-100 bg-slate-50/50 p-4">
+              <section
+                key={k}
+                className="mt-4 rounded-3xl border border-slate-100 bg-slate-50/50 p-4"
+              >
                 <h3 className="text-base font-black text-slate-900">{stepsByKey[k].title}</h3>
                 <p className="text-sm text-slate-600">{stepsByKey[k].subtitle}</p>
                 <div className="mt-3">{renderFields(k)}</div>
@@ -690,7 +710,9 @@ export default function DailyReportPage() {
                     className="w-full min-h-[120px] rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-4 focus:ring-blue-100"
                     placeholder="Cuéntanos con tus palabras qué pasó hoy…"
                     value={formData.observaciones}
-                    onChange={(e) => setFormData((p) => ({ ...p, observaciones: e.target.value }))}
+                    onChange={(e) =>
+                      setFormData((p) => ({ ...p, observaciones: e.target.value }))
+                    }
                   />
                 </div>
               </div>
