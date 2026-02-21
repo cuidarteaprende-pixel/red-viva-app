@@ -15,12 +15,12 @@ export default function GatewayPage() {
                         initial={{ opacity: 0, scale: 0.9 }}
                         animate={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.5 }}
-                        className="flex flex-col items-center"
+                        className="flex flex-col items-center intro-animateheader"
                     >
                         <img
                             src="/red-viva-logo.png"
                             alt="Red Viva Logo"
-                            className="h-24 md:h-32 w-auto mb-6 drop-shadow-sm"
+                            className="h-24 md:h-32 w-auto mb-6 drop-shadow-sm transition-transform hover:scale-105 duration-700"
                         />
                         <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-slate-50 border border-slate-100 shadow-sm mb-4">
                             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
@@ -35,7 +35,7 @@ export default function GatewayPage() {
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: 0.1, duration: 0.5 }}
-                            className="text-5xl md:text-7xl font-display font-black text-slate-900 tracking-tight"
+                            className="text-5xl md:text-7xl font-display font-black text-slate-900 tracking-tight intro-animatetitle"
                         >
                             Cuidamos lo que <span className="text-primary italic">más importa.</span>
                         </motion.h1>
@@ -62,6 +62,7 @@ export default function GatewayPage() {
                         image="/caregiver_portal.jpg"
                         color="rose"
                         delay={0.3}
+                        className="intro-animatecard-left"
                     />
 
                     {/* Professional Option */}
@@ -73,6 +74,7 @@ export default function GatewayPage() {
                         image="/professional_portal.jpg"
                         color="blue"
                         delay={0.4}
+                        className="intro-animatecard-right"
                     />
                 </div>
 
@@ -94,7 +96,8 @@ function RoleCard({
     icon,
     image,
     color,
-    delay
+    delay,
+    className
 }: {
     href: string;
     title: string;
@@ -103,13 +106,14 @@ function RoleCard({
     image: string;
     color: "rose" | "blue";
     delay: number;
+    className?: string;
 }) {
     return (
         <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay, duration: 0.5 }}
-            className="h-full"
+            className={cn("h-full", className)}
         >
             <Link
                 href={href}

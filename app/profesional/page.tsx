@@ -73,11 +73,11 @@ export default function ProfesionalPortal() {
                 <img src="/hero_background.png" alt="Red Viva" className="w-full h-full object-cover opacity-10" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#020617] via-transparent to-[#020617]"></div>
             </div>
-            <div className="w-full max-w-md glass-card-dark p-12 rounded-[3rem] border border-white/10 relative z-10 shadow-2xl">
+            <div className="w-full max-w-md bg-slate-900/40 backdrop-blur-2xl p-12 rounded-[3.5rem] border border-white/10 relative z-10 shadow-2xl intro-animateheader">
                 <div className="text-center mb-10">
-                    <img src="/red-viva-logo.png" alt="Red Viva" className="brand-logo mx-auto mb-6" />
-                    <h1 className="text-3xl font-black font-outfit text-white uppercase tracking-tighter">Portal Profesional</h1>
-                    <p className="text-slate-400 text-sm mt-2 font-bold">Acceso seguro interdisciplinario</p>
+                    <img src="/red-viva-logo.png" alt="Red Viva" className="brand-logo mx-auto mb-6 transition-transform duration-700 hover:scale-110" />
+                    <h1 className="text-3xl font-black font-display text-white uppercase tracking-tighter intro-animatetitle">Portal Profesional</h1>
+                    <p className="text-slate-400 text-sm mt-2 font-bold intro-animatetitle">Acceso seguro interdisciplinario</p>
                 </div>
                 <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">

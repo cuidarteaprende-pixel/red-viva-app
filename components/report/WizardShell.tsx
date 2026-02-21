@@ -49,7 +49,7 @@ export default function WizardShell({
                                 <X className="w-5 h-5" />
                             </Link>
                         )}
-                        <div>
+                        <div className="intro-animateheader">
                             <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
                                 PASO {currentStep + 1} DE {totalSteps}
                             </p>
@@ -72,7 +72,7 @@ export default function WizardShell({
                     <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${progress}%` }}
-                        className="h-full bg-primary"
+                        className="h-full bg-primary progress-bar-glow"
                         transition={{ duration: 0.5, ease: "circOut" }}
                     />
                 </div>
@@ -89,7 +89,7 @@ export default function WizardShell({
                         transition={{ duration: 0.3 }}
                         className="space-y-8"
                     >
-                        <div className="space-y-2">
+                        <div className="space-y-2 intro-animatetitle">
                             <h2 className="text-3xl font-black font-display text-slate-900 leading-tight">
                                 {title}
                             </h2>

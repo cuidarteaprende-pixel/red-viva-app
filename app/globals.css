@@ -32,13 +32,13 @@
 }
 
 :root {
-  --background: #F0F7FF;
+  --background: #F8FAFC;
   --foreground: #0f172a;
 
-  --primary: #2563eb;
+  --primary: #2E6A99;
   --primary-foreground: #ffffff;
 
-  --secondary: #22c55e;
+  --secondary: #4CAF88;
   --secondary-foreground: #ffffff;
 
   --muted: #f1f5f9;
@@ -52,9 +52,9 @@
 
   --border: #e2e8f0;
   --input: #e2e8f0;
-  --ring: #2563eb;
+  --ring: #2E6A99;
 
-  --radius: 1rem;
+  --radius: 1.25rem;
 
   /* Brand Scale */
   --brand-logo-height: 36px;
@@ -80,6 +80,9 @@
   body {
     @apply bg-background text-foreground antialiased selection:bg-primary/20;
     font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+    background-image:
+      radial-gradient(at 0% 0%, rgba(46, 106, 153, 0.03) 0px, transparent 50%),
+      radial-gradient(at 100% 0%, rgba(76, 175, 136, 0.03) 0px, transparent 50%);
   }
 
   button,
@@ -92,78 +95,195 @@
 @layer components {
   .glass-card {
     @apply bg-white/70 backdrop-blur-xl border border-white/20;
-    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.07);
+    box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.04);
   }
 
   .premium-gradient {
-    background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+    background: linear-gradient(135deg, #2E6A99 0%, #1e4d70 100%);
   }
 
   .text-gradient {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-indigo-600;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-[#4A90E2];
   }
 
   .brand-logo {
     height: var(--brand-logo-height);
     width: auto;
     object-fit: contain;
-    transition: all 0.3s ease;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .hover-card {
-    @apply transition-all duration-300 hover:scale-[1.01] hover:shadow-xl hover:shadow-slate-200 active:scale-[0.99];
+    @apply transition-all duration-500 cubic-bezier(0.16, 1, 0.3, 1) hover:scale-[1.02] hover:shadow-2xl hover:shadow-slate-200 active:scale-[0.98];
   }
 
   .btn-premium {
-    @apply transition-all duration-200 hover:brightness-110 hover:shadow-lg active:scale-95;
+    @apply transition-all duration-300 hover:brightness-110 hover:shadow-lg active:scale-95 font-bold tracking-wide;
   }
 }
 
-/* Custom Scrollbar */
+/* --- EXCELENCIA VISUAL RED VIVA (V3 WOW) --- */
+
+/* 1. Animaciones de Entrada Orgánica */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+    filter: blur(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(40px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Aplicación en Gateway */
+.intro-animateheader {
+  animation: fadeInUp 1s ease-out forwards;
+}
+
+.intro-animatetitle {
+  animation: fadeInUp 1s ease-out 0.2s forwards;
+  opacity: 0;
+}
+
+.intro-animatecard-left {
+  animation: slideInLeft 1s cubic-bezier(0.16, 1, 0.3, 1) 0.5s forwards;
+  opacity: 0;
+}
+
+.intro-animatecard-right {
+  animation: slideInRight 1s cubic-bezier(0.16, 1, 0.3, 1) 0.7s forwards;
+  opacity: 0;
+}
+
+/* 2. Micro-interacciones de Botones y Cards */
+.group:hover .group-hover\:scale-110 {
+  transform: scale(1.1) rotate(-2deg);
+}
+
+/* 3. Tipografía con Jerarquía "Calming" */
+h1 span.text-primary {
+  text-shadow: 0 0 20px rgba(46, 106, 153, 0.15);
+  position: relative;
+  display: inline-block;
+}
+
+h1 span.text-primary::after {
+  content: '';
+  position: absolute;
+  bottom: 0px;
+  left: 0;
+  width: 100%;
+  height: 4px;
+  background: rgba(46, 106, 153, 0.1);
+  border-radius: 2px;
+  transform: scaleX(0);
+  transition: transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  transform-origin: left;
+}
+
+h1:hover span.text-primary::after {
+  transform: scaleX(1);
+}
+
+/* 4. Pulse Orgánico para Alertas */
+.animate-pulse-subtle {
+  animation: organicPulse 3s infinite;
+}
+
+@keyframes organicPulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.3);
+    border-color: rgba(244, 63, 94, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 0 20px rgba(244, 63, 94, 0);
+    border-color: rgba(244, 63, 94, 0.6);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+    border-color: rgba(244, 63, 94, 0.2);
+  }
+}
+
+/* 5. Custom Scrollbar Velvet */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  @apply bg-transparent;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
+  background: #E2E8F0;
+  border: 3px solid var(--background);
+  border-radius: 10px;
 }
 
-.animate-float {
-  animation: float 6s ease-in-out infinite;
+::-webkit-scrollbar-thumb:hover {
+  background: #CBD5E1;
 }
 
-@keyframes float {
-  0% {
-    transform: translateY(0px);
-  }
-
-  50% {
-    transform: translateY(-10px);
-  }
-
-  100% {
-    transform: translateY(0px);
-  }
+/* 6. Mejoras en Formulario (Wizard) */
+input[type="radio"]:checked+label,
+.option-selected {
+  border-color: var(--primary) !important;
+  background-color: rgba(46, 106, 153, 0.04) !important;
+  box-shadow: 0 0 0 2px rgba(46, 106, 153, 0.1) !important;
 }
 
-.animate-pulse-subtle {
-  animation: pulse-subtle 3s ease-in-out infinite;
+/* 7. Sombras de Profundidad "Elevation" */
+.shadow-premium {
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
-@keyframes pulse-subtle {
+/* 8. Efectos de Glassmorphism mas suaves */
+.glass-ui {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
 
-  0%,
-  100% {
-    box-shadow: 0 0 20px 0 rgba(244, 63, 94, 0.1), 0 8px 32px 0 rgba(31, 38, 135, 0.07);
-    border-color: rgba(251, 113, 133, 0.2);
-  }
+/* 9. Feedback Hático Visual */
+button:active {
+  transform: scale(0.96) !important;
+}
 
-  50% {
-    box-shadow: 0 0 40px 10px rgba(244, 63, 94, 0.25), 0 8px 32px 0 rgba(31, 38, 135, 0.1);
-    border-color: rgba(251, 113, 133, 0.6);
-  }
+/* 10. Progresión Visual */
+.progress-bar-glow {
+  box-shadow: 0 0 10px var(--primary);
+  transition: width 0.6s cubic-bezier(0.65, 0, 0.35, 1);
 }

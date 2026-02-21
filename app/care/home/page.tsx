@@ -94,28 +94,28 @@ export default function CareHomePage() {
         <div className="space-y-10 selection:bg-primary/20">
             {/* Welcome Header */}
             <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-                <div>
+                <div className="intro-animateheader">
                     <h1 className="text-3xl md:text-4xl font-display font-black text-slate-900 tracking-tight">
                         Hola, <span className="text-primary italic">{caregiver?.nombre || "Cuidador"}</span>
                     </h1>
-                    <p className="text-slate-500 mt-2 font-medium text-lg">
+                    <p className="text-slate-500 mt-2 font-medium text-lg intro-animatetitle">
                         Hoy es {caregiver ? new Intl.DateTimeFormat('es-ES', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date()) : ""}
                     </p>
                 </div>
 
                 {/* Elder Selector */}
-                <div className="relative group">
+                <div className="relative group intro-animatetitle">
                     <label className="absolute -top-2.5 left-4 px-2 bg-white text-[10px] font-black uppercase tracking-widest text-slate-400 z-10 transition-colors group-focus-within:text-primary">
                         Persona en cuidado
                     </label>
-                    <div className="flex items-center gap-3 bg-white border-2 border-slate-100 rounded-2xl p-1 pr-6 focus-within:border-primary transition-all shadow-sm">
+                    <div className="flex items-center gap-3 bg-white border-2 border-slate-100 rounded-2xl p-1 pr-6 focus-within:border-primary transition-all shadow-premium">
                         <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center">
                             <User className="w-5 h-5 text-slate-400" />
                         </div>
                         <select
                             value={selectedId}
                             onChange={(e) => setSelectedId(e.target.value)}
-                            className="bg-transparent border-none outline-none font-bold text-sm pr-4 appearance-none min-w-[140px] focus:ring-0"
+                            className="bg-transparent border-none outline-none font-bold text-sm pr-4 appearance-none min-w-[140px] focus:ring-0 text-slate-900"
                         >
                             {adultos.map(a => (
                                 <option key={a.id} value={a.id}>{a.nombre}</option>
@@ -129,16 +129,16 @@ export default function CareHomePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 {/* Urgent Action */}
                 <motion.div
-                    whileHover={{ scale: 1.02 }}
+                    whileHover={{ scale: 1.02, translateY: -5 }}
                     whileTap={{ scale: 0.98 }}
                     className="relative"
                 >
                     <Link
                         href="/care/report/urgent"
-                        className="group relative block h-full bg-rose-500 text-white rounded-[2.5rem] p-10 shadow-2xl shadow-rose-500/20 overflow-hidden border-4 border-rose-400/30 animate-pulse-subtle"
+                        className="group relative block h-full bg-rose-500 text-white rounded-[2.5rem] p-10 shadow-2xl shadow-rose-500/20 overflow-hidden border-4 border-rose-400/30 animate-pulse-subtle intro-animatecard-left"
                     >
                         <div className="relative z-10">
-                            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-8 transition-transform group-hover:scale-110">
+                            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center mb-8 transition-transform group-hover:scale-110 group-hover:rotate-6">
                                 <AlertCircle className="w-8 h-8" />
                             </div>
                             <h2 className="text-4xl font-display font-black mb-4 tracking-tight">Acción Urgente</h2>
@@ -162,10 +162,10 @@ export default function CareHomePage() {
                 <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}>
                     <Link
                         href="/care/report/daily"
-                        className="group relative block h-full bg-white border-2 border-slate-100 hover:border-primary/30 transition-all rounded-[3rem] p-10 shadow-xl shadow-slate-100 overflow-hidden hover-card"
+                        className="group relative block h-full bg-white border-2 border-slate-100 hover:border-primary/30 transition-all rounded-[3rem] p-10 shadow-premium shadow-slate-100 overflow-hidden hover-card intro-animatecard-right"
                     >
                         <div className="relative z-10">
-                            <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center mb-8 transition-all group-hover:bg-primary group-hover:text-white">
+                            <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center mb-8 transition-all group-hover:bg-primary group-hover:text-white group-hover:rotate-[-6deg]">
                                 <FileText className="w-8 h-8 text-primary group-hover:text-white" />
                             </div>
                             <h2 className="text-4xl font-display font-black mb-4 text-slate-900 tracking-tight">Diario 360</h2>
