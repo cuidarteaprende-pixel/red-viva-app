@@ -1,8 +1,9 @@
 "use client";
 
-import { useSearchParams, useRouter } from "next/navigation";
+import { Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function DailyReportSuccessPage() {
+function SuccessInner() {
   const params = useSearchParams();
   const router = useRouter();
 
@@ -43,5 +44,19 @@ export default function DailyReportSuccessPage() {
         <p className="mt-6 text-xs text-slate-400">RED VIVA SYSTEM • v2.0</p>
       </div>
     </div>
+  );
+}
+
+export default function DailyReportSuccessPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+          <p className="text-slate-500 font-semibold">Cargando…</p>
+        </div>
+      }
+    >
+      <SuccessInner />
+    </Suspense>
   );
 }
