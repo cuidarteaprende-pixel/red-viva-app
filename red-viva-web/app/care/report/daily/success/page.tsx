@@ -20,7 +20,7 @@ function SuccessInner() {
         <h1 className="text-2xl font-black text-slate-900">¡Gracias!</h1>
 
         <p className="mt-3 text-slate-700 leading-relaxed">
-          Gracias por la información. Es muy importante para el cuidado {target} y para apoyarte en tu labor diaria.
+          La información que nos brindas es muy importante para el cuidado {target} y para apoyarte en tu labor diaria.
         </p>
 
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
