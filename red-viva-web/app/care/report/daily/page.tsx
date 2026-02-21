@@ -24,8 +24,8 @@ type Respuestas = Record<StepKey, StepData>;
 type FormData = {
   fechaHora: string;
   respuestas: Respuestas;
-  observaciones: string; // solo al final
   notaGeneral: string; // solo al final
+  observaciones: string; // solo al final
 };
 
 type StepDef = {
@@ -46,9 +46,9 @@ type StepGroup = {
 function nowIsoLocal(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
-    d.getDate()
-  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours()
+  )}:${pad(d.getMinutes())}`;
 }
 
 function ensureRespuestas(): Respuestas {
@@ -75,23 +75,19 @@ export default function DailyReportPage() {
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Cargar sesión + ids
+  /**
+   * Cargar sesión y determinar caregiverId / adultoId
+   * - En demo, permite guardar con cuidador DEMO aunque no haya sesión.
+   */
   useEffect(() => {
     let cancelled = false;
 
-    async function safeSet(partial: {
-      adultoId?: string | null;
-      caregiverId?: string | null;
-      adultoNombre?: string | null;
-    }) {
+    const safeSet = (fn: () => void) => {
       if (cancelled) return;
-      if ("adultoId" in partial) setAdultoId(partial.adultoId ?? null);
-      if ("caregiverId" in partial) setCaregiverId(partial.caregiverId ?? null);
-      if ("adultoNombre" in partial) setAdultoNombre(partial.adultoNombre ?? null);
-    }
+      fn();
+    };
 
     async function fetchAdultName(id: string) {
-      // adultos_mayores aparece UNRESTRICTED en tu Supabase, esto debería funcionar.
       const { data, error } = await supabase
         .from("adultos_mayores")
         .select("nombre")
@@ -102,18 +98,18 @@ export default function DailyReportPage() {
       return (data?.nombre as string | undefined) ?? null;
     }
 
-    async function loadForLoggedUser(authUserId: string) {
+    async function loadLoggedUser(authUserId: string) {
       const { data: cg, error: cgErr } = await supabase
         .from("cuidadores")
         .select("id")
         .eq("auth_user_id", authUserId)
         .maybeSingle();
 
-      if (cgErr) console.error("[SESSION] cuidador error:", cgErr);
+      if (cgErr) console.error("[SESSION] cuidadores error:", cgErr);
 
-      const cgId = cg?.id ?? null;
-      await safeSet({ caregiverId: cgId });
+      safeSet(() => setCaregiverId((cg?.id as string | undefined) ?? null));
 
+      const cgId = (cg?.id as string | undefined) ?? null;
       if (!cgId) return;
 
       const { data: assignments, error: asErr } = await supabase
@@ -127,13 +123,17 @@ export default function DailyReportPage() {
       const firstAdult = assignments?.[0]?.adulto_id as string | undefined;
       if (firstAdult) {
         const name = await fetchAdultName(firstAdult);
-        await safeSet({ adultoId: firstAdult, adultoNombre: name });
+        safeSet(() => {
+          setAdultoId(firstAdult);
+          setAdultoNombre(name);
+        });
       }
     }
 
-    async function loadForDemo() {
-      console.warn("[DEMO_MODE] Sin sesión. Cargando adulto de prueba.");
+    async function loadDemo() {
+      console.warn("[DEMO_MODE] Sin sesión. Usando perfiles de prueba.");
 
+      // adulto: toma el primero disponible
       const { data: anyAdult, error } = await supabase
         .from("adultos_mayores")
         .select("id, nombre")
@@ -142,14 +142,14 @@ export default function DailyReportPage() {
 
       if (error) console.error("[DEMO_MODE] adultos_mayores error:", error);
 
-      await safeSet({
-        adultoId: (anyAdult?.id as string | undefined) ?? null,
-        adultoNombre: (anyAdult?.nombre as string | undefined) ?? null,
-        caregiverId: null, // puede quedar null; en submit usamos DEMO_CUIDADOR_ID
+      safeSet(() => {
+        setAdultoId((anyAdult?.id as string | undefined) ?? null);
+        setAdultoNombre((anyAdult?.nombre as string | undefined) ?? null);
+        setCaregiverId(null); // se usará DEMO_CUIDADOR_ID al guardar
       });
 
       toast.info("Modo Demo activo", {
-        description: "No se detectó sesión. Guardará con cuidador DEMO.",
+        description: "Se guardará con un cuidador DEMO para validar el flujo.",
       });
     }
 
@@ -163,9 +163,9 @@ export default function DailyReportPage() {
         if (sessErr) console.error("[SESSION] getSession error:", sessErr);
 
         if (session?.user?.id) {
-          await loadForLoggedUser(session.user.id);
+          await loadLoggedUser(session.user.id);
         } else if (DEMO_MODE) {
-          await loadForDemo();
+          await loadDemo();
         } else {
           toast.error("Sesión no detectada", {
             description: "Debes iniciar sesión para guardar el reporte.",
@@ -174,7 +174,7 @@ export default function DailyReportPage() {
       } catch (e) {
         console.error("Error cargando sesión:", e);
       } finally {
-        if (!cancelled) setLoading(false);
+        safeSet(() => setLoading(false));
       }
     }
 
@@ -185,9 +185,6 @@ export default function DailyReportPage() {
     };
   }, [DEMO_MODE]);
 
-  /**
-   * Definición por sección
-   */
   const stepsByKey: Record<StepKey, StepDef> = useMemo(
     () => ({
       salud_fisica: {
@@ -264,8 +261,8 @@ export default function DailyReportPage() {
   const [formData, setFormData] = useState<FormData>({
     fechaHora: nowIsoLocal(),
     respuestas: ensureRespuestas(),
-    observaciones: "",
     notaGeneral: "",
+    observaciones: "",
   });
 
   const currentGroup = stepGroups[stepIndex];
@@ -298,28 +295,24 @@ export default function DailyReportPage() {
   const handleSubmit = async () => {
     console.log("click guardar reporte", { adultoId, caregiverId, DEMO_MODE });
 
-    // ✅ En demo permitimos caregiverId null
+    // En demo permitimos caregiverId null (se usa DEMO_CUIDADOR_ID)
     if (!adultoId || (!caregiverId && !DEMO_MODE)) {
       toast.error("No se puede guardar: falta identificar perfil.", {
         description: DEMO_MODE
-          ? "Falta adultoId. Revisa permisos o datos."
+          ? "No se detectó adultoId. Revisa que existan adultos_mayores."
           : "Debes iniciar sesión para guardar el reporte.",
       });
       return;
     }
 
-    const cuidadorIdFinal = caregiverId ?? DEMO_CUIDADOR_ID;
-
     setSaving(true);
 
     try {
+      const cuidadorIdFinal = caregiverId ?? DEMO_CUIDADOR_ID;
+
       const notasFinales = [
-        formData.notaGeneral?.trim()
-          ? `Nota corta: ${formData.notaGeneral.trim()}`
-          : null,
-        formData.observaciones?.trim()
-          ? `Observaciones: ${formData.observaciones.trim()}`
-          : null,
+        formData.notaGeneral?.trim() ? `Nota corta: ${formData.notaGeneral.trim()}` : null,
+        formData.observaciones?.trim() ? `Observaciones: ${formData.observaciones.trim()}` : null,
       ]
         .filter(Boolean)
         .join("\n\n");
@@ -335,25 +328,26 @@ export default function DailyReportPage() {
 
       console.log("payload", payload);
 
-      const { data, error } = await supabase
-        .from("reportes_cuidador")
-        .insert(payload)
-        .select();
+      const { data, error } = await supabase.from("reportes_cuidador").insert(payload).select();
 
       console.log("insert result", { data, error });
 
       if (error) {
-        console.error("Supabase error:", error);
         toast.error("Error al guardar", {
-          description: `${error.code ?? ""} ${error.message ?? ""} ${error.details ?? ""}`.trim(),
+          description: `${error.code ?? ""} ${error.message ?? ""}`.trim(),
         });
         return;
       }
 
-      // ✅ Redirigir a pantalla "Gracias"
+      // ✅ confirmación + redirect a success
+      toast.success("¡Gracias! Reporte guardado con éxito.");
+
       const nombre = adultoNombre?.trim() || "";
       const qs = nombre ? `?adulto=${encodeURIComponent(nombre)}` : "";
-      router.push(`/care/report/daily/success${qs}`);
+
+      setTimeout(() => {
+        router.push(`/care/report/daily/success${qs}`);
+      }, 900);
     } catch (err) {
       console.error("Unexpected error:", err);
       toast.error("Ocurrió un error inesperado al guardar.");
@@ -710,9 +704,7 @@ export default function DailyReportPage() {
                     className="w-full min-h-[120px] rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-4 focus:ring-blue-100"
                     placeholder="Cuéntanos con tus palabras qué pasó hoy…"
                     value={formData.observaciones}
-                    onChange={(e) =>
-                      setFormData((p) => ({ ...p, observaciones: e.target.value }))
-                    }
+                    onChange={(e) => setFormData((p) => ({ ...p, observaciones: e.target.value }))}
                   />
                 </div>
               </div>
@@ -758,7 +750,7 @@ export default function DailyReportPage() {
 }
 
 /**
- * Componentes UI simples
+ * UI Components
  */
 function Input({
   label,
