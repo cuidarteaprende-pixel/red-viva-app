@@ -1,12 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, AlertTriangle, ArrowRight } from "lucide-react";
+import { Heart, AlertTriangle, ArrowRight, Lock } from "lucide-react";
 
 export default function ReporteCuidadorPage() {
   return (
     <main className="min-h-screen bg-slate-50">
-      {/* Fondo suave para profundidad */}
       <div className="relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(16,185,129,0.14),_transparent_55%)]" />
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_right,_rgba(239,68,68,0.12),_transparent_55%)]" />
@@ -25,7 +24,6 @@ export default function ReporteCuidadorPage() {
                 </p>
               </div>
 
-              {/* Chip de guía UX (no cambia contenido, solo ayuda visual) */}
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-widest text-emerald-700 shadow-sm">
                 <span className="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
                 Listo para registrar
@@ -35,12 +33,11 @@ export default function ReporteCuidadorPage() {
 
           {/* Cards */}
           <section className="grid gap-6 md:grid-cols-2">
-            {/* Reporte diario */}
+            {/* Reporte diario (activo) */}
             <Link
               href="/care/report/daily"
               className="group relative rounded-[2.5rem] border border-slate-200/70 bg-white/75 backdrop-blur-md p-7 md:p-8 shadow-[0_18px_50px_rgba(2,6,23,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(2,6,23,0.10)] focus:outline-none focus-visible:ring-4 focus-visible:ring-emerald-400/30"
             >
-              {/* Accento superior */}
               <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-[2.5rem] bg-gradient-to-r from-emerald-500 to-emerald-600" />
 
               <div className="flex items-start justify-between gap-4">
@@ -66,16 +63,18 @@ export default function ReporteCuidadorPage() {
                 <ArrowRight className="w-4 h-4" />
               </div>
 
-              {/* sutil decoración */}
               <div className="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-emerald-500/10 blur-2xl" />
             </Link>
 
-            {/* Evento / novedad */}
-            <a
-              href="/care/report/event"
-              className="group relative rounded-[2.5rem] border border-slate-200/70 bg-white/75 backdrop-blur-md p-7 md:p-8 shadow-[0_18px_50px_rgba(2,6,23,0.06)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_28px_70px_rgba(2,6,23,0.10)] focus:outline-none focus-visible:ring-4 focus-visible:ring-rose-400/30"
-            >
+            {/* Evento / novedad (próximamente - sin ruta) */}
+            <div className="group relative rounded-[2.5rem] border border-slate-200/70 bg-white/60 backdrop-blur-md p-7 md:p-8 shadow-[0_18px_50px_rgba(2,6,23,0.05)]">
               <div className="absolute inset-x-0 top-0 h-1.5 rounded-t-[2.5rem] bg-gradient-to-r from-rose-500 to-rose-600" />
+
+              {/* Badge Próximamente */}
+              <div className="absolute right-6 top-6 inline-flex items-center gap-2 rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-rose-700">
+                <Lock className="w-3.5 h-3.5" />
+                Próximamente
+              </div>
 
               <div className="flex items-start justify-between gap-4">
                 <div className="w-14 h-14 rounded-2xl bg-rose-50 border border-rose-100 flex items-center justify-center shadow-sm">
@@ -95,17 +94,18 @@ export default function ReporteCuidadorPage() {
                 Registra un evento puntual (caída, síntoma agudo, incidente, etc.).
               </p>
 
-              <div className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-lg shadow-slate-900/10 transition-all group-hover:gap-4 group-hover:bg-black">
+              {/* CTA deshabilitado visualmente */}
+              <div className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-slate-200 px-5 py-3 text-sm font-black text-slate-600 cursor-not-allowed">
                 Registrar evento
                 <ArrowRight className="w-4 h-4" />
               </div>
 
               <p className="mt-3 text-xs text-slate-500">
-                (Si esta ruta aún no existe, puedes ocultar este botón por ahora.)
+                (Esta funcionalidad está en construcción para la siguiente versión.)
               </p>
 
               <div className="absolute -right-12 -bottom-12 h-48 w-48 rounded-full bg-rose-500/10 blur-2xl" />
-            </a>
+            </div>
           </section>
 
           {/* Notas */}
