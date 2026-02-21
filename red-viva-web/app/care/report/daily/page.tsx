@@ -1,12 +1,17 @@
 "use client";
 
-import { useMemo, useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
 /**
- * Tipos base
+ * Config
+ */
+const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+/**
+ * Tipos
  */
 type StepKey =
   | "salud_fisica"
@@ -21,34 +26,25 @@ type StepKey =
 type StepData = Record<string, unknown>;
 type Respuestas = Record<StepKey, StepData>;
 
-type FormData = {
-  fechaHora: string;
-  respuestas: Respuestas;
-  notaGeneral: string; // solo al final
-  observaciones: string; // solo al final
-};
-
-type StepDef = {
-  key: StepKey;
-  title: string;
-  subtitle: string;
-};
-
 type StepGroup = {
   title: string;
   subtitle: string;
   keys: StepKey[];
 };
 
-/**
- * Helpers
- */
+type FormData = {
+  fechaHora: string; // ISO local string
+  respuestas: Respuestas;
+  notaCorta: string;
+  observaciones: string;
+};
+
 function nowIsoLocal(): string {
   const d = new Date();
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+    d.getDate()
+  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function ensureRespuestas(): Respuestas {
@@ -64,172 +60,27 @@ function ensureRespuestas(): Respuestas {
   };
 }
 
-const DEMO_CUIDADOR_ID = "00000000-0000-0000-0000-000000000001";
+/**
+ * UI helpers
+ */
+const SCALE_1_5 = [
+  "1 — Nada",
+  "2 — Leve",
+  "3 — Moderado",
+  "4 — Alto",
+  "5 — Muy alto",
+];
 
 export default function DailyReportPage() {
   const router = useRouter();
-  const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   const [adultoId, setAdultoId] = useState<string | null>(null);
-  const [adultoNombre, setAdultoNombre] = useState<string | null>(null);
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
-  /**
-   * Cargar sesión y determinar caregiverId / adultoId
-   * - En demo, permite guardar con cuidador DEMO aunque no haya sesión.
-   */
-  useEffect(() => {
-    let cancelled = false;
-
-    const safeSet = (fn: () => void) => {
-      if (cancelled) return;
-      fn();
-    };
-
-    async function fetchAdultName(id: string) {
-      const { data, error } = await supabase
-        .from("adultos_mayores")
-        .select("nombre")
-        .eq("id", id)
-        .maybeSingle();
-
-      if (error) console.error("[ADULTO] nombre error:", error);
-      return (data?.nombre as string | undefined) ?? null;
-    }
-
-    async function loadLoggedUser(authUserId: string) {
-      const { data: cg, error: cgErr } = await supabase
-        .from("cuidadores")
-        .select("id")
-        .eq("auth_user_id", authUserId)
-        .maybeSingle();
-
-      if (cgErr) console.error("[SESSION] cuidadores error:", cgErr);
-
-      safeSet(() => setCaregiverId((cg?.id as string | undefined) ?? null));
-
-      const cgId = (cg?.id as string | undefined) ?? null;
-      if (!cgId) return;
-
-      const { data: assignments, error: asErr } = await supabase
-        .from("asignaciones_cuidado")
-        .select("adulto_id")
-        .eq("cuidador_id", cgId)
-        .limit(1);
-
-      if (asErr) console.error("[SESSION] asignaciones error:", asErr);
-
-      const firstAdult = assignments?.[0]?.adulto_id as string | undefined;
-      if (firstAdult) {
-        const name = await fetchAdultName(firstAdult);
-        safeSet(() => {
-          setAdultoId(firstAdult);
-          setAdultoNombre(name);
-        });
-      }
-    }
-
-    async function loadDemo() {
-      console.warn("[DEMO_MODE] Sin sesión. Usando perfiles de prueba.");
-
-      // adulto: toma el primero disponible
-      const { data: anyAdult, error } = await supabase
-        .from("adultos_mayores")
-        .select("id, nombre")
-        .limit(1)
-        .maybeSingle();
-
-      if (error) console.error("[DEMO_MODE] adultos_mayores error:", error);
-
-      safeSet(() => {
-        setAdultoId((anyAdult?.id as string | undefined) ?? null);
-        setAdultoNombre((anyAdult?.nombre as string | undefined) ?? null);
-        setCaregiverId(null); // se usará DEMO_CUIDADOR_ID al guardar
-      });
-
-      toast.info("Modo Demo activo", {
-        description: "Se guardará con un cuidador DEMO para validar el flujo.",
-      });
-    }
-
-    async function load() {
-      try {
-        const {
-          data: { session },
-          error: sessErr,
-        } = await supabase.auth.getSession();
-
-        if (sessErr) console.error("[SESSION] getSession error:", sessErr);
-
-        if (session?.user?.id) {
-          await loadLoggedUser(session.user.id);
-        } else if (DEMO_MODE) {
-          await loadDemo();
-        } else {
-          toast.error("Sesión no detectada", {
-            description: "Debes iniciar sesión para guardar el reporte.",
-          });
-        }
-      } catch (e) {
-        console.error("Error cargando sesión:", e);
-      } finally {
-        safeSet(() => setLoading(false));
-      }
-    }
-
-    load();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [DEMO_MODE]);
-
-  const stepsByKey: Record<StepKey, StepDef> = useMemo(
-    () => ({
-      salud_fisica: {
-        key: "salud_fisica",
-        title: "Salud física y signos",
-        subtitle: "Chequeo simple (dolor, fiebre, respiración, energía).",
-      },
-      movilidad: {
-        key: "movilidad",
-        title: "Movilidad y riesgo de caídas",
-        subtitle: "Marcha, equilibrio, caídas o casi caídas.",
-      },
-      nutricion: {
-        key: "nutricion",
-        title: "Nutrición e hidratación",
-        subtitle: "Comidas, líquidos, evacuación y señales de deshidratación.",
-      },
-      medicacion: {
-        key: "medicacion",
-        title: "Medicación",
-        subtitle: "Adherencia, olvidos y efectos secundarios.",
-      },
-      higiene_piel: {
-        key: "higiene_piel",
-        title: "Higiene, piel e incontinencia",
-        subtitle: "Integridad de piel, lesiones y cuidado personal.",
-      },
-      sueno: {
-        key: "sueno",
-        title: "Sueño y descanso",
-        subtitle: "Calidad del sueño, despertares y agitación nocturna.",
-      },
-      cognicion_emocional: {
-        key: "cognicion_emocional",
-        title: "Cognición y estado emocional",
-        subtitle: "Orientación, confusión y estado de ánimo.",
-      },
-      entorno_cuidador: {
-        key: "entorno_cuidador",
-        title: "Entorno + social + cuidador",
-        subtitle: "Riesgos en casa, interacción social y carga del cuidador.",
-      },
-    }),
-    []
-  );
+  // Debug visible (clave para no adivinar)
+  const [debugMsg, setDebugMsg] = useState<string>("");
 
   /**
    * ✅ 3 pasos (grupos)
@@ -255,18 +106,16 @@ export default function DailyReportPage() {
     []
   );
 
-  const [stepIndex, setStepIndex] = useState<number>(0);
-  const [saving, setSaving] = useState<boolean>(false);
+  const [groupIndex, setGroupIndex] = useState(0);
+  const isLastGroup = groupIndex === stepGroups.length - 1;
+  const currentGroup = stepGroups[groupIndex];
 
   const [formData, setFormData] = useState<FormData>({
     fechaHora: nowIsoLocal(),
     respuestas: ensureRespuestas(),
-    notaGeneral: "",
+    notaCorta: "",
     observaciones: "",
   });
-
-  const currentGroup = stepGroups[stepIndex];
-  const isLastGroup = stepIndex === stepGroups.length - 1;
 
   const updateStepData = (stepKey: StepKey, field: string, value: unknown) => {
     setFormData((prev) => ({
@@ -281,90 +130,288 @@ export default function DailyReportPage() {
     }));
   };
 
-  const handlePrev = () => setStepIndex((i) => Math.max(0, i - 1));
+  /**
+   * Carga IDs (sesión o demo)
+   */
+  useEffect(() => {
+    async function loadSessionAndIds() {
+      setDebugMsg("");
+      try {
+        const {
+          data: { session },
+          error: sessErr,
+        } = await supabase.auth.getSession();
+
+        if (sessErr) {
+          console.warn("Error getSession:", sessErr);
+        }
+
+        // A) CON sesión: mapear cuidador por auth_user_id
+        if (session) {
+          setDebugMsg(`✅ Sesión detectada: ${session.user.email ?? session.user.id}`);
+
+          const { data: cg, error: cgErr } = await supabase
+            .from("cuidadores")
+            .select("id")
+            .eq("auth_user_id", session.user.id)
+            .maybeSingle();
+
+          if (cgErr) {
+            console.warn("Error buscando cuidador por sesión:", cgErr);
+            setDebugMsg(
+              (prev) =>
+                prev + `\n⚠️ No pude mapear cuidador por auth_user_id: ${cgErr.message}`
+            );
+          }
+
+          if (cg?.id) {
+            setCaregiverId(cg.id);
+            setDebugMsg((prev) => prev + `\n✅ cuidador_id: ${cg.id}`);
+
+            const { data: assignments, error: asgErr } = await supabase
+              .from("asignaciones_cuidado")
+              .select("adulto_id")
+              .eq("cuidador_id", cg.id)
+              .limit(1);
+
+            if (asgErr) {
+              console.warn("Error buscando asignación:", asgErr);
+              setDebugMsg((prev) => prev + `\n⚠️ Error asignación: ${asgErr.message}`);
+            }
+
+            if (assignments?.length) {
+              setAdultoId(assignments[0].adulto_id);
+              setDebugMsg((prev) => prev + `\n✅ adulto_id (asignado): ${assignments[0].adulto_id}`);
+            } else {
+              setDebugMsg(
+                (prev) =>
+                  prev +
+                  `\n⚠️ No encontré asignaciones_cuidado para este cuidador (adulto_id queda vacío).`
+              );
+            }
+          } else {
+            setDebugMsg(
+              (prev) =>
+                prev +
+                `\n❌ No encontré cuidador asociado a este usuario (tabla cuidadores.auth_user_id).`
+            );
+          }
+        }
+
+        // B) SIN sesión + DEMO: usar primer cuidador + primer adulto
+        if (!session && DEMO_MODE) {
+          setDebugMsg("🟡 DEMO_MODE activo: NO hay sesión. Tomando primer cuidador y primer adulto.");
+
+          const { data: fallbackCg, error: fcgErr } = await supabase
+            .from("cuidadores")
+            .select("id")
+            .order("id", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          const { data: fallbackAm, error: famErr } = await supabase
+            .from("adultos_mayores")
+            .select("id")
+            .order("id", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (fcgErr) setDebugMsg((prev) => prev + `\n⚠️ DEMO cuidadores error: ${fcgErr.message}`);
+          if (famErr) setDebugMsg((prev) => prev + `\n⚠️ DEMO adultos error: ${famErr.message}`);
+
+          if (fallbackCg?.id) {
+            setCaregiverId(fallbackCg.id);
+            setDebugMsg((prev) => prev + `\n✅ DEMO cuidador_id: ${fallbackCg.id}`);
+          } else {
+            setDebugMsg((prev) => prev + `\n❌ DEMO: no hay cuidadores en la tabla.`);
+          }
+
+          if (fallbackAm?.id) {
+            setAdultoId(fallbackAm.id);
+            setDebugMsg((prev) => prev + `\n✅ DEMO adulto_id: ${fallbackAm.id}`);
+          } else {
+            setDebugMsg((prev) => prev + `\n❌ DEMO: no hay adultos_mayores en la tabla.`);
+          }
+
+          toast.info("Modo Demo activo", {
+            description: "Sin sesión. Se usarán perfiles de prueba.",
+          });
+        }
+
+        // C) SIN sesión y NO demo
+        if (!session && !DEMO_MODE) {
+          toast.error("Sesión no detectada", {
+            description: "Debes iniciar sesión para enviar el reporte.",
+          });
+          setDebugMsg("❌ No hay sesión. Inicia sesión o activa DEMO_MODE.");
+        }
+      } catch (e: any) {
+        console.error("loadSessionAndIds error:", e);
+        setDebugMsg(`❌ Error inesperado en loadSessionAndIds: ${e?.message ?? String(e)}`);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadSessionAndIds();
+  }, []);
+
+  const handlePrev = () => {
+    setGroupIndex((i) => Math.max(0, i - 1));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   const handleNext = async () => {
-    if (stepIndex < stepGroups.length - 1) {
-      setStepIndex((i) => i + 1);
+    if (groupIndex < stepGroups.length - 1) {
+      setGroupIndex((i) => i + 1);
       window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
     await handleSubmit();
   };
 
+  /**
+   * Inserta con fallback por esquema + errores explícitos
+   */
+  async function insertWithFallback(payload: any) {
+    // 1) Intento estándar (respuestas jsonb)
+    try {
+      const res = await supabase
+        .from("reportes_cuidador")
+        .insert(payload)
+        .select()
+        .throwOnError();
+
+      return { data: res.data, error: null };
+    } catch (e: any) {
+      const msg = String(e?.message ?? e);
+      console.warn("[Insert estándar falló]", e);
+
+      // Solo hacemos fallback si parece ser por columna inexistente
+      const looksLikeMissingColumn =
+        msg.toLowerCase().includes("column") && msg.toLowerCase().includes("does not exist");
+
+      if (!looksLikeMissingColumn) {
+        return { data: null, error: { message: msg } };
+      }
+
+      // 2) Fallback: guardar en contenido/notas (texto)
+      const fallbackPayload: any = {
+        adulto_id: payload.adulto_id,
+        cuidador_id: payload.cuidador_id,
+        tipo_reporte: payload.tipo_reporte ?? "diario",
+        fecha: payload.fecha,
+        contenido: JSON.stringify(payload.respuestas ?? {}),
+        notas: payload.notas ?? null,
+      };
+
+      try {
+        const res2 = await supabase
+          .from("reportes_cuidador")
+          .insert(fallbackPayload)
+          .select()
+          .throwOnError();
+
+        return { data: res2.data, error: null };
+      } catch (e2: any) {
+        const msg2 = String(e2?.message ?? e2);
+        console.warn("[Insert fallback falló]", e2);
+        return { data: null, error: { message: msg2 } };
+      }
+    }
+  }
+
   const handleSubmit = async () => {
+    setDebugMsg((prev) => prev + "\n\n🟣 Intentando guardar reporte…");
     console.log("click guardar reporte", { adultoId, caregiverId, DEMO_MODE });
 
-    // En demo permitimos caregiverId null (se usa DEMO_CUIDADOR_ID)
-    if (!adultoId || (!caregiverId && !DEMO_MODE)) {
-      toast.error("No se puede guardar: falta identificar perfil.", {
-        description: DEMO_MODE
-          ? "No se detectó adultoId. Revisa que existan adultos_mayores."
-          : "Debes iniciar sesión para guardar el reporte.",
+    if (!adultoId || !caregiverId) {
+      toast.error("No se puede guardar el reporte", {
+        description:
+          "Falta identificar el cuidador o el adulto. Revisa debug abajo (asignación / sesión / demo).",
       });
+      setDebugMsg(
+        (prev) =>
+          prev +
+          `\n❌ No puedo guardar: adultoId=${adultoId ?? "null"} caregiverId=${
+            caregiverId ?? "null"
+          }`
+      );
       return;
     }
 
     setSaving(true);
 
     try {
-      const cuidadorIdFinal = caregiverId ?? DEMO_CUIDADOR_ID;
+      const fechaISO = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
-      const notasFinales = [
-        formData.notaGeneral?.trim() ? `Nota corta: ${formData.notaGeneral.trim()}` : null,
-        formData.observaciones?.trim() ? `Observaciones: ${formData.observaciones.trim()}` : null,
-      ]
-        .filter(Boolean)
-        .join("\n\n");
+      const notasFinal =
+        `Nota corta: ${formData.notaCorta || "—"}\n` +
+        `Observaciones: ${formData.observaciones || "—"}`;
 
       const payload = {
         adulto_id: adultoId,
-        cuidador_id: cuidadorIdFinal,
+        cuidador_id: caregiverId,
         tipo_reporte: "diario",
-        fecha: new Date().toISOString().split("T")[0],
+        fecha: fechaISO,
         respuestas: formData.respuestas,
-        notas: notasFinales || null,
+        notas: notasFinal,
       };
 
-      console.log("payload", payload);
+      setDebugMsg((prev) => prev + `\n📦 Payload listo (fecha=${fechaISO})`);
 
-      const { data, error } = await supabase.from("reportes_cuidador").insert(payload).select();
+      const result = await insertWithFallback(payload);
 
-      console.log("insert result", { data, error });
-
-      if (error) {
-        toast.error("Error al guardar", {
-          description: `${error.code ?? ""} ${error.message ?? ""}`.trim(),
+      if (result.error) {
+        toast.error("No se pudo guardar el reporte", {
+          description: result.error.message,
         });
+        setDebugMsg((prev) => prev + `\n❌ INSERT ERROR: ${result.error.message}`);
         return;
       }
 
-      // ✅ confirmación + redirect a success
-      toast.success("¡Gracias! Reporte guardado con éxito.");
+      setDebugMsg((prev) => prev + `\n✅ Guardado OK. Filas insertadas: ${result.data?.length ?? 0}`);
 
-      const nombre = adultoNombre?.trim() || "";
-      const qs = nombre ? `?adulto=${encodeURIComponent(nombre)}` : "";
+      // Buscar nombre para success
+      const { data: adultoRow, error: adultoErr } = await supabase
+        .from("adultos_mayores")
+        .select("nombre")
+        .eq("id", adultoId)
+        .maybeSingle();
 
-      setTimeout(() => {
-        router.push(`/care/report/daily/success${qs}`);
-      }, 900);
-    } catch (err) {
-      console.error("Unexpected error:", err);
-      toast.error("Ocurrió un error inesperado al guardar.");
+      if (adultoErr) {
+        console.warn("No pude leer nombre del adulto:", adultoErr);
+        setDebugMsg((prev) => prev + `\n⚠️ No pude leer nombre del adulto: ${adultoErr.message}`);
+      }
+
+      const adultoNombre = adultoRow?.nombre ?? "";
+      toast.success("Reporte guardado", { description: "Redirigiendo a confirmación…" });
+
+      router.push(
+        `/care/report/daily/success?adulto=${encodeURIComponent(adultoNombre)}`
+      );
+    } catch (e: any) {
+      console.error("Unexpected error:", e);
+      toast.error("Error inesperado al guardar el reporte", {
+        description: e?.message ?? "Revisa consola",
+      });
+      setDebugMsg((prev) => prev + `\n❌ ERROR inesperado: ${e?.message ?? String(e)}`);
     } finally {
       setSaving(false);
     }
   };
 
+  /**
+   * Render de secciones por StepKey
+   */
   const renderFields = (k: StepKey) => {
-    const v = (field: string) =>
-      (formData.respuestas[k] as Record<string, unknown> | undefined)?.[field];
+    const v = (field: string) => (formData.respuestas[k] as any)?.[field];
     const set = (field: string, value: unknown) => updateStepData(k, field, value);
 
     switch (k) {
       case "salud_fisica":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Salud física y signos" subtitle="Dolor, fiebre, respiración, energía">
             <Select
               label="Dolor"
               value={(v("dolor") as string | undefined) ?? ""}
@@ -394,12 +441,12 @@ export default function DailyReportPage() {
               onChange={(val) => set("sintomas", val)}
               options={["Ninguno", "Mareo", "Náuseas", "Diarrea", "Estreñimiento", "Otro"]}
             />
-          </div>
+          </SectionCard>
         );
 
       case "movilidad":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Movilidad y riesgo de caídas" subtitle="Marcha, equilibrio, caídas o casi caídas">
             <Select
               label="¿Caminó hoy?"
               value={(v("camino") as string | undefined) ?? ""}
@@ -423,12 +470,12 @@ export default function DailyReportPage() {
               value={(v("dolor_movimiento") as boolean | undefined) ?? null}
               onChange={(val) => set("dolor_movimiento", val)}
             />
-          </div>
+          </SectionCard>
         );
 
       case "nutricion":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Nutrición e hidratación" subtitle="Comidas, líquidos, evacuación y señales">
             <Select
               label="Comió"
               value={(v("comio") as string | undefined) ?? ""}
@@ -458,12 +505,12 @@ export default function DailyReportPage() {
               onChange={(val) => set("deshidratacion", val)}
               placeholder="boca seca / orina muy amarilla / mareo…"
             />
-          </div>
+          </SectionCard>
         );
 
       case "medicacion":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Medicación" subtitle="Adherencia, olvidos y efectos">
             <Select
               label="¿Tomó medicamentos como se indicó?"
               value={(v("adherencia") as string | undefined) ?? ""}
@@ -487,12 +534,12 @@ export default function DailyReportPage() {
               onChange={(val) => set("lista", val)}
               placeholder="Medicamento – hora (ej: Losartán 8:00am)"
             />
-          </div>
+          </SectionCard>
         );
 
       case "higiene_piel":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Higiene, piel e incontinencia" subtitle="Integridad de piel, lesiones y cuidado">
             <Select
               label="Higiene"
               value={(v("higiene") as string | undefined) ?? ""}
@@ -505,243 +552,243 @@ export default function DailyReportPage() {
               onChange={(val) => set("piel", val)}
               options={["🟢 Bien", "🟡 Enrojecida", "🔴 Herida o llaga"]}
             />
-            <Select
-              label="Incontinencia"
-              value={(v("incontinencia") as string | undefined) ?? ""}
+            <YesNo
+              label="¿Hay incontinencia hoy?"
+              value={(v("incontinencia") as boolean | undefined) ?? null}
               onChange={(val) => set("incontinencia", val)}
-              options={["No", "Orina", "Heces", "Ambas"]}
+            />
+            <YesNo
+              label="¿Hubo cambio de pañal/ropa a tiempo?"
+              value={(v("cambio_panal") as boolean | undefined) ?? null}
+              onChange={(val) => set("cambio_panal", val)}
             />
             <Input
-              label="Si hay lesión: ubicación (opcional)"
-              value={(v("lesion_ubicacion") as string | undefined) ?? ""}
-              onChange={(val) => set("lesion_ubicacion", val)}
-              placeholder="sacro / talón / cadera / otro"
+              label="Zonas afectadas (si aplica)"
+              value={(v("zonas") as string | undefined) ?? ""}
+              onChange={(val) => set("zonas", val)}
+              placeholder="Ej: sacro, talones, caderas…"
             />
-          </div>
+            <Input
+              label="Observaciones (opcional)"
+              value={(v("observaciones_piel") as string | undefined) ?? ""}
+              onChange={(val) => set("observaciones_piel", val)}
+              placeholder="Ej: enrojecimiento leve, aplicar crema…"
+            />
+          </SectionCard>
         );
 
       case "sueno":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Sueño" subtitle="Calidad, despertares y descanso">
             <Select
-              label="Durmió"
-              value={(v("durmio") as string | undefined) ?? ""}
-              onChange={(val) => set("durmio", val)}
-              options={["😴 Mal", "🙂 Regular", "😃 Bien"]}
+              label="Calidad del sueño"
+              value={(v("calidad") as string | undefined) ?? ""}
+              onChange={(val) => set("calidad", val)}
+              options={["Buena", "Regular", "Mala"]}
             />
             <YesNo
-              label="¿Se despertó muchas veces?"
+              label="¿Se despertó varias veces?"
               value={(v("despertares") as boolean | undefined) ?? null}
               onChange={(val) => set("despertares", val)}
-            />
-            <YesNo
-              label="¿Agitación nocturna?"
-              value={(v("agitacion") as boolean | undefined) ?? null}
-              onChange={(val) => set("agitacion", val)}
             />
             <Select
               label="Siestas"
               value={(v("siestas") as string | undefined) ?? ""}
               onChange={(val) => set("siestas", val)}
-              options={["No", "Sí (corta)", "Sí (larga)"]}
+              options={["No", "Sí, corta", "Sí, larga"]}
             />
-          </div>
+            <Input
+              label="Horas aproximadas dormidas (opcional)"
+              value={(v("horas") as string | undefined) ?? ""}
+              onChange={(val) => set("horas", val)}
+              placeholder="Ej: 6.5"
+            />
+            <Input
+              label="Observaciones (opcional)"
+              value={(v("observaciones_sueno") as string | undefined) ?? ""}
+              onChange={(val) => set("observaciones_sueno", val)}
+              placeholder="Ej: ronquidos, dolor nocturno…"
+            />
+          </SectionCard>
         );
 
       case "cognicion_emocional":
         return (
-          <div className="space-y-4">
+          <SectionCard title="Cognición y estado emocional" subtitle="Ánimo, orientación y conducta">
             <Select
-              label="¿Estuvo orientado?"
-              value={(v("orientado") as string | undefined) ?? ""}
-              onChange={(val) => set("orientado", val)}
-              options={["Sí", "A veces", "No"]}
-            />
-            <Select
-              label="Memoria hoy"
-              value={(v("memoria") as string | undefined) ?? ""}
-              onChange={(val) => set("memoria", val)}
-              options={["Bien", "Regular", "Mal"]}
+              label="Estado de ánimo"
+              value={(v("animo") as string | undefined) ?? ""}
+              onChange={(val) => set("animo", val)}
+              options={["🙂 Bien", "😐 Neutro", "😟 Triste", "😠 Irritable", "😰 Ansioso"]}
             />
             <YesNo
-              label="¿Confusión o delirios?"
+              label="¿Hubo confusión o desorientación?"
               value={(v("confusion") as boolean | undefined) ?? null}
               onChange={(val) => set("confusion", val)}
             />
             <Select
-              label="Ánimo"
-              value={(v("animo") as string | undefined) ?? ""}
-              onChange={(val) => set("animo", val)}
-              options={["😟 Bajo", "😐 Neutro", "🙂 Bueno"]}
+              label="Interacción / comunicación"
+              value={(v("interaccion") as string | undefined) ?? ""}
+              onChange={(val) => set("interaccion", val)}
+              options={["Normal", "Más callado", "Agitado", "No quiso hablar"]}
             />
+            {/* AQUÍ QUEDAN Ansiedad y Estrés con escala clara */}
             <Select
               label="Ansiedad (1–5)"
               value={(v("ansiedad") as string | undefined) ?? ""}
               onChange={(val) => set("ansiedad", val)}
-              options={["1", "2", "3", "4", "5"]}
-            />
-            <p className="text-xs text-slate-500 -mt-2">
-              1 = Nada / tranquilo · 3 = Moderado · 5 = Muy alto
-            </p>
-            <YesNo
-              label="¿Irritabilidad/enojo?"
-              value={(v("enojo") as boolean | undefined) ?? null}
-              onChange={(val) => set("enojo", val)}
-            />
-          </div>
-        );
-
-      case "entorno_cuidador":
-        return (
-          <div className="space-y-4">
-            <Select
-              label="Riesgos en casa hoy"
-              value={(v("riesgos") as string | undefined) ?? ""}
-              onChange={(val) => set("riesgos", val)}
-              options={["Ninguno", "Piso mojado", "Alfombras", "Mala luz", "Otro"]}
-            />
-            <YesNo
-              label="¿Usó ayudas (bastón/caminador)?"
-              value={(v("ayudas") as boolean | undefined) ?? null}
-              onChange={(val) => set("ayudas", val)}
-            />
-            <Select
-              label="¿Interacción social hoy?"
-              value={(v("social") as string | undefined) ?? ""}
-              onChange={(val) => set("social", val)}
-              options={["Sí", "No"]}
-            />
-            <Select
-              label="¿Cómo te sientes tú hoy?"
-              value={(v("cuidador_estado") as string | undefined) ?? ""}
-              onChange={(val) => set("cuidador_estado", val)}
-              options={["😵 Muy cansado", "😐 Normal", "🙂 Bien"]}
+              options={SCALE_1_5}
             />
             <Select
               label="Estrés (1–5)"
               value={(v("estres") as string | undefined) ?? ""}
               onChange={(val) => set("estres", val)}
-              options={["1", "2", "3", "4", "5"]}
+              options={SCALE_1_5}
             />
-            <p className="text-xs text-slate-500 -mt-2">
-              1 = Bajo · 3 = Medio · 5 = Alto / sobrecarga
-            </p>
-            <YesNo
-              label="¿Necesitas apoyo?"
-              value={(v("apoyo") as boolean | undefined) ?? null}
-              onChange={(val) => set("apoyo", val)}
+            <Input
+              label="Cambios importantes (opcional)"
+              value={(v("cambios") as string | undefined) ?? ""}
+              onChange={(val) => set("cambios", val)}
+              placeholder="Ej: más olvidos, llanto, agresividad…"
             />
-          </div>
+          </SectionCard>
         );
+
+      case "entorno_cuidador":
+        return (
+          <SectionCard title="Entorno y cuidador" subtitle="Seguridad del entorno y carga del cuidador">
+            <Select
+              label="Entorno"
+              value={(v("entorno") as string | undefined) ?? ""}
+              onChange={(val) => set("entorno", val)}
+              options={["Seguro", "Con riesgos (alfombras, escalones…)", "No evaluado"]}
+            />
+            <YesNo
+              label="¿Hubo algún incidente en casa hoy?"
+              value={(v("incidente") as boolean | undefined) ?? null}
+              onChange={(val) => set("incidente", val)}
+            />
+            <Select
+              label="Carga del cuidador"
+              value={(v("carga") as string | undefined) ?? ""}
+              onChange={(val) => set("carga", val)}
+              options={SCALE_1_5}
+            />
+            <Input
+              label="Nota final del cuidador (opcional)"
+              value={(v("nota") as string | undefined) ?? ""}
+              onChange={(val) => set("nota", val)}
+              placeholder="Ej: hoy fue difícil por…, necesito apoyo en…"
+            />
+          </SectionCard>
+        );
+
+      default:
+        return null;
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin" />
-          <p className="font-bold text-slate-400 uppercase tracking-widest text-xs">
-            Cargando datos del cuidador...
-          </p>
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="max-w-3xl mx-auto">
+          <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+            <p className="text-slate-700">Cargando reporte…</p>
+            <p className="text-sm text-slate-500 mt-2">
+              Verificando sesión / demo / asignación.
+            </p>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-3xl px-4 py-6">
-        <header className="mb-6">
-          <h1 className="text-2xl font-black text-slate-900">Reporte Diario 360°</h1>
-          <p className="text-slate-600">Formulario simplificado a 3 pasos.</p>
-        </header>
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="max-w-3xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h1 className="text-2xl font-semibold text-slate-900">Reporte diario</h1>
+          <p className="text-sm text-slate-600 mt-1">
+            Completa el reporte en 3 pasos. Al final podrás agregar nota y observaciones.
+          </p>
 
-        <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-slate-400">
-                Paso {stepIndex + 1} / {stepGroups.length}
-              </p>
-              <h2 className="text-xl font-black text-slate-900">{currentGroup.title}</h2>
-              <p className="text-slate-600 text-sm">{currentGroup.subtitle}</p>
+          <div className="mt-4">
+            <ProgressBar value={Math.round(((groupIndex + 1) / stepGroups.length) * 100)} />
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-500">
+              <span>
+                Paso {groupIndex + 1} de {stepGroups.length}
+              </span>
+              <span>{currentGroup.title}</span>
             </div>
           </div>
+        </div>
 
-          <div className="mt-4 grid gap-4">
-            <Input
-              label="Fecha y hora de diligenciamiento"
-              value={formData.fechaHora}
-              onChange={(val) => setFormData((p) => ({ ...p, fechaHora: val }))}
-              placeholder="YYYY-MM-DDTHH:mm"
-            />
+        {/* Grupo */}
+        <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
+          <h2 className="text-xl font-semibold text-slate-900">{currentGroup.title}</h2>
+          <p className="text-sm text-slate-600 mt-1">{currentGroup.subtitle}</p>
 
+          <div className="mt-6 space-y-5">
             {currentGroup.keys.map((k) => (
-              <section
-                key={k}
-                className="mt-4 rounded-3xl border border-slate-100 bg-slate-50/50 p-4"
-              >
-                <h3 className="text-base font-black text-slate-900">{stepsByKey[k].title}</h3>
-                <p className="text-sm text-slate-600">{stepsByKey[k].subtitle}</p>
-                <div className="mt-3">{renderFields(k)}</div>
-              </section>
+              <div key={k}>{renderFields(k)}</div>
             ))}
 
-            {isLastGroup && (
-              <div className="mt-2 grid gap-4">
-                <Input
-                  label="Nota corta general (opcional)"
-                  value={formData.notaGeneral}
-                  onChange={(val) => setFormData((p) => ({ ...p, notaGeneral: val }))}
-                  placeholder="Algo breve y relevante"
+            {isLastGroup ? (
+              <SectionCard title="Cierre" subtitle="Notas finales del reporte">
+                <Textarea
+                  label="Nota corta (opcional)"
+                  value={formData.notaCorta}
+                  onChange={(val) => setFormData((prev) => ({ ...prev, notaCorta: val }))}
+                  placeholder="Ej: hoy estuvo más cansado de lo normal…"
                 />
+                <Textarea
+                  label="Observaciones (opcional)"
+                  value={formData.observaciones}
+                  onChange={(val) =>
+                    setFormData((prev) => ({ ...prev, observaciones: val }))
+                  }
+                  placeholder="Ej: vigilar hidratación, contactar profesional si…"
+                />
+              </SectionCard>
+            ) : null}
+          </div>
 
-                <div>
-                  <label className="block text-sm font-bold text-slate-900 mb-2">
-                    Observaciones libres (opcional)
-                  </label>
-                  <textarea
-                    className="w-full min-h-[120px] rounded-2xl border border-slate-200 bg-slate-50 p-4 outline-none focus:ring-4 focus:ring-blue-100"
-                    placeholder="Cuéntanos con tus palabras qué pasó hoy…"
-                    value={formData.observaciones}
-                    onChange={(e) => setFormData((p) => ({ ...p, observaciones: e.target.value }))}
-                  />
-                </div>
-              </div>
-            )}
+          <div className="mt-6 flex items-center justify-between gap-3">
+            <button
+              type="button"
+              onClick={handlePrev}
+              disabled={groupIndex === 0 || saving}
+              className="px-4 py-2 rounded-xl border border-slate-300 bg-white text-slate-800 disabled:opacity-50"
+            >
+              Atrás
+            </button>
 
-            <div className="mt-2 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={handlePrev}
-                disabled={stepIndex === 0 || saving}
-                className="rounded-2xl px-4 py-3 font-bold text-slate-700 disabled:opacity-40"
-              >
-                Volver
-              </button>
+            <button
+              type="button"
+              onClick={handleNext}
+              disabled={saving}
+              className="px-5 py-2 rounded-xl bg-emerald-600 text-white font-medium disabled:opacity-50"
+            >
+              {groupIndex < stepGroups.length - 1
+                ? "Siguiente"
+                : saving
+                ? "Guardando…"
+                : "Guardar reporte"}
+            </button>
+          </div>
 
-              <button
-                type="button"
-                onClick={handleNext}
-                disabled={saving}
-                className="rounded-2xl bg-blue-600 px-5 py-3 font-black text-white shadow-sm active:scale-[0.99] disabled:opacity-60"
-              >
-                {saving ? "Guardando…" : isLastGroup ? "Guardar reporte" : "Siguiente"}
-              </button>
-            </div>
+          {/* DEBUG: esto te dirá EXACTAMENTE por qué no guarda */}
+          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
+            <p className="text-xs font-semibold text-slate-700 mb-2">DEBUG (no se sube a producción si no quieres)</p>
+            <pre className="text-xs text-slate-700 whitespace-pre-wrap">
+{`DEMO_MODE: ${DEMO_MODE}
+adultoId: ${adultoId ?? "null"}
+caregiverId: ${caregiverId ?? "null"}
 
-            <div className="pt-4 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => router.push("/care/report/urgent")}
-                className="w-full rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3 font-black text-rose-700"
-              >
-                Reportar urgencia (evento crítico)
-              </button>
-              <p className="mt-2 text-xs text-slate-500">
-                Si ocurrió una caída, confusión severa o algo urgente, repórtalo aquí.
-              </p>
-            </div>
+${debugMsg || "(sin debug aún)"}
+`}
+            </pre>
           </div>
         </div>
       </div>
@@ -749,29 +796,35 @@ export default function DailyReportPage() {
   );
 }
 
-/**
- * UI Components
- */
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
+/* -------------------------
+   Componentes UI (locales)
+------------------------- */
+
+function SectionCard({
+  title,
+  subtitle,
+  children,
 }: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
 }) {
   return (
-    <div>
-      <label className="block text-sm font-bold text-slate-900 mb-2">{label}</label>
-      <input
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:ring-4 focus:ring-blue-100"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-      />
+    <div className="bg-white border border-slate-200 rounded-2xl p-5 space-y-4 shadow-sm">
+      <div>
+        <h3 className="text-lg font-semibold text-slate-900">{title}</h3>
+        {subtitle ? <p className="text-sm text-slate-500 mt-1">{subtitle}</p> : null}
+      </div>
+      <div className="space-y-4">{children}</div>
+    </div>
+  );
+}
+
+function ProgressBar({ value }: { value: number }) {
+  const v = Math.max(0, Math.min(100, value));
+  return (
+    <div className="w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+      <div className="h-full bg-emerald-600" style={{ width: `${v}%` }} />
     </div>
   );
 }
@@ -788,21 +841,21 @@ function Select({
   options: string[];
 }) {
   return (
-    <div>
-      <label className="block text-sm font-bold text-slate-900 mb-2">{label}</label>
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
       <select
-        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 outline-none focus:ring-4 focus:ring-blue-100"
+        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
         value={value}
         onChange={(e) => onChange(e.target.value)}
       >
         <option value="">Selecciona…</option>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
+        {options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
           </option>
         ))}
       </select>
-    </div>
+    </label>
   );
 }
 
@@ -816,32 +869,80 @@ function YesNo({
   onChange: (v: boolean) => void;
 }) {
   return (
-    <div>
-      <p className="block text-sm font-bold text-slate-900 mb-2">{label}</p>
-      <div className="flex gap-3">
+    <div className="space-y-2">
+      <p className="text-sm font-medium text-slate-700">{label}</p>
+      <div className="flex gap-2">
         <button
           type="button"
-          onClick={() => onChange(true)}
-          className={`flex-1 rounded-2xl px-4 py-3 font-black ${
+          className={`px-4 py-2 rounded-xl border ${
             value === true
-              ? "bg-emerald-600 text-white"
-              : "bg-slate-50 border border-slate-200 text-slate-800"
+              ? "bg-emerald-50 border-emerald-400 text-emerald-800"
+              : "bg-white border-slate-300 text-slate-800"
           }`}
+          onClick={() => onChange(true)}
         >
           Sí
         </button>
         <button
           type="button"
-          onClick={() => onChange(false)}
-          className={`flex-1 rounded-2xl px-4 py-3 font-black ${
+          className={`px-4 py-2 rounded-xl border ${
             value === false
-              ? "bg-rose-600 text-white"
-              : "bg-slate-50 border border-slate-200 text-slate-800"
+              ? "bg-emerald-50 border-emerald-400 text-emerald-800"
+              : "bg-white border-slate-300 text-slate-800"
           }`}
+          onClick={() => onChange(false)}
         >
           No
         </button>
       </div>
     </div>
+  );
+}
+
+function Input({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <input
+        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
+  );
+}
+
+function Textarea({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="block space-y-2">
+      <span className="text-sm font-medium text-slate-700">{label}</span>
+      <textarea
+        className="w-full min-h-[110px] rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </label>
   );
 }
