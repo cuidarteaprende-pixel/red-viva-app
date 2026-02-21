@@ -64,17 +64,18 @@ function ensureRespuestas(): Respuestas {
   };
 }
 
+// ✅ ID fijo para modo demo (debe existir en tabla cuidadores si hay FK)
+const DEMO_CUIDADOR_ID = "00000000-0000-0000-0000-000000000001";
+
 export default function DailyReportPage() {
   const router = useRouter();
 
-  // ✅ Demo mode controlado por env var (client-safe)
   const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
   const [adultoId, setAdultoId] = useState<string | null>(null);
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch session and default IDs on mount
   useEffect(() => {
     let cancelled = false;
 
@@ -85,7 +86,6 @@ export default function DailyReportPage() {
     }
 
     async function loadIdsForLoggedUser(authUserId: string) {
-      // 1) caregiver id
       const { data: cg, error: cgErr } = await supabase
         .from("cuidadores")
         .select("id")
@@ -99,7 +99,6 @@ export default function DailyReportPage() {
 
       if (!cgId) return;
 
-      // 2) assigned adult
       const { data: assignments, error: asErr } = await supabase
         .from("asignaciones_cuidado")
         .select("adulto_id")
@@ -113,7 +112,6 @@ export default function DailyReportPage() {
         return;
       }
 
-      // 3) fallback any adult
       const { data: anyAdult, error: adErr } = await supabase
         .from("adultos_mayores")
         .select("id")
@@ -125,16 +123,10 @@ export default function DailyReportPage() {
     }
 
     async function loadIdsForDemo() {
-      console.warn("[DEMO_MODE] Sin sesión. Cargando perfiles de prueba.");
+      console.warn("[DEMO_MODE] Sin sesión. Cargando perfiles de prueba (adulto).");
 
-      const { data: fallbackCg, error: cgErr } = await supabase
-        .from("cuidadores")
-        .select("id")
-        .limit(1)
-        .maybeSingle();
-
-      if (cgErr) console.error("[DEMO_MODE] caregiver error", cgErr);
-
+      // En demo: intentamos leer un adulto para no bloquear el formulario
+      // (si esto falla por RLS, igual lo verás en consola)
       const { data: fallbackAm, error: amErr } = await supabase
         .from("adultos_mayores")
         .select("id")
@@ -144,12 +136,13 @@ export default function DailyReportPage() {
       if (amErr) console.error("[DEMO_MODE] adulto error", amErr);
 
       await setIdsSafe({
-        cuidador: fallbackCg?.id ?? null,
+        cuidador: null, // 👈 puede quedar null por RLS, lo manejamos en submit
         adulto: fallbackAm?.id ?? null,
       });
 
       toast.info("Modo Demo activo", {
-        description: "No se detectó sesión. Se usarán perfiles de prueba para permitir guardar.",
+        description:
+          "No se detectó sesión. Se usará cuidador DEMO si no se puede leer cuidador por permisos.",
       });
     }
 
@@ -271,9 +264,6 @@ export default function DailyReportPage() {
   const currentGroup = stepGroups[stepIndex];
   const isLastGroup = stepIndex === stepGroups.length - 1;
 
-  /**
-   * Actualizador de respuestas por sección
-   */
   const updateStepData = (stepKey: StepKey, field: string, value: unknown) => {
     setFormData((prev) => ({
       ...prev,
@@ -301,23 +291,23 @@ export default function DailyReportPage() {
   const handleSubmit = async () => {
     console.log("click guardar reporte", { adultoId, caregiverId, DEMO_MODE });
 
-    if (!adultoId || !caregiverId) {
+    // ✅ En demo permitimos que caregiverId sea null y usamos DEMO_CUIDADOR_ID
+    if (!adultoId || (!caregiverId && !DEMO_MODE)) {
       toast.error("No se puede guardar: falta identificar perfil.", {
         description: DEMO_MODE
-          ? "En modo demo deben cargarse perfiles. Verifica datos en 'cuidadores' y 'adultos_mayores'."
+          ? "Falta adultoId. Revisa permisos o datos de adultos_mayores."
           : "Debes iniciar sesión para guardar el reporte.",
       });
       return;
     }
 
+    const cuidadorIdFinal = caregiverId ?? DEMO_CUIDADOR_ID;
+
     setSaving(true);
 
     try {
-      // ✅ Guardamos TODO en 'notas' (solo existe esa columna)
       const notasFinales = [
-        formData.notaGeneral?.trim()
-          ? `Nota corta: ${formData.notaGeneral.trim()}`
-          : null,
+        formData.notaGeneral?.trim() ? `Nota corta: ${formData.notaGeneral.trim()}` : null,
         formData.observaciones?.trim()
           ? `Observaciones: ${formData.observaciones.trim()}`
           : null,
@@ -327,22 +317,27 @@ export default function DailyReportPage() {
 
       const payload = {
         adulto_id: adultoId,
-        cuidador_id: caregiverId,
+        cuidador_id: cuidadorIdFinal,
         tipo_reporte: "diario",
-        fecha: new Date().toISOString().split("T")[0], // YYYY-MM-DD
+        fecha: new Date().toISOString().split("T")[0],
         respuestas: formData.respuestas,
         notas: notasFinales || null,
       };
 
       console.log("payload", payload);
 
-      const { data, error } = await supabase.from("reportes_cuidador").insert(payload).select();
+      const { data, error } = await supabase
+        .from("reportes_cuidador")
+        .insert(payload)
+        .select();
 
       console.log("insert result", { data, error });
 
       if (error) {
         console.error("Supabase error:", error);
-        toast.error(`Error al guardar: ${error.message}`);
+        toast.error("Error al guardar", {
+          description: `${error.code ?? ""} ${error.message ?? ""} ${error.details ?? ""}`.trim(),
+        });
         return;
       }
 
@@ -356,9 +351,6 @@ export default function DailyReportPage() {
     }
   };
 
-  /**
-   * Campos por sección (mismas preguntas)
-   */
   const renderFields = (k: StepKey) => {
     const v = (field: string) =>
       (formData.respuestas[k] as Record<string, unknown> | undefined)?.[field];
@@ -651,7 +643,7 @@ export default function DailyReportPage() {
       <div className="mx-auto max-w-3xl px-4 py-6">
         <header className="mb-6">
           <h1 className="text-2xl font-black text-slate-900">Reporte Diario 360°</h1>
-          <p className="text-slate-600">Completa el formulario. Ahora es más corto y fácil.</p>
+          <p className="text-slate-600">Formulario simplificado a 3 pasos.</p>
         </header>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -687,7 +679,7 @@ export default function DailyReportPage() {
                   label="Nota corta general (opcional)"
                   value={formData.notaGeneral}
                   onChange={(val) => setFormData((p) => ({ ...p, notaGeneral: val }))}
-                  placeholder="Algo breve y relevante (ej: tuvo un día más tranquilo)"
+                  placeholder="Algo breve y relevante"
                 />
 
                 <div>
