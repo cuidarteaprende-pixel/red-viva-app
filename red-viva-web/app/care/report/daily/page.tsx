@@ -5,14 +5,8 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
 
-/**
- * Config
- */
 const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
 
-/**
- * Tipos
- */
 type StepKey =
   | "salud_fisica"
   | "movilidad"
@@ -33,7 +27,7 @@ type StepGroup = {
 };
 
 type FormData = {
-  fechaHora: string; // ISO local string
+  fechaHora: string;
   respuestas: Respuestas;
   notaCorta: string;
   observaciones: string;
@@ -60,9 +54,6 @@ function ensureRespuestas(): Respuestas {
   };
 }
 
-/**
- * UI helpers
- */
 const SCALE_1_5 = [
   "1 — Nada",
   "2 — Leve",
@@ -75,16 +66,14 @@ export default function DailyReportPage() {
   const router = useRouter();
 
   const [adultoId, setAdultoId] = useState<string | null>(null);
+  const [adultoNombre, setAdultoNombre] = useState<string>("");
   const [caregiverId, setCaregiverId] = useState<string | null>(null);
+  const [caregiverNombre, setCaregiverNombre] = useState<string>("Cuidador Demo");
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // Debug visible (clave para no adivinar)
   const [debugMsg, setDebugMsg] = useState<string>("");
 
-  /**
-   * ✅ 3 pasos (grupos)
-   */
   const stepGroups: StepGroup[] = useMemo(
     () => [
       {
@@ -132,40 +121,37 @@ export default function DailyReportPage() {
 
   /**
    * Carga IDs (sesión o demo)
+   * IMPORTANTE: Tu BD NO tiene cuidadores (o no se usa), así que:
+   * - siempre aseguramos adulto_id
+   * - y guardamos cuidador como texto (cuidador_nombre) para demo
    */
   useEffect(() => {
-    async function loadSessionAndIds() {
+    async function loadIds() {
       setDebugMsg("");
       try {
         const {
           data: { session },
-          error: sessErr,
         } = await supabase.auth.getSession();
 
-        if (sessErr) {
-          console.warn("Error getSession:", sessErr);
-        }
-
-        // A) CON sesión: mapear cuidador por auth_user_id
+        // 1) Adulto: si hay sesión, intentamos asignación; si no, demo.
+        // Primero intentamos asignación si hay sesión y existe la tabla asignaciones.
         if (session) {
           setDebugMsg(`✅ Sesión detectada: ${session.user.email ?? session.user.id}`);
 
+          // Intento: buscar cuidador por sesión (si existe tabla cuidadores)
           const { data: cg, error: cgErr } = await supabase
             .from("cuidadores")
-            .select("id")
+            .select("id, nombre")
             .eq("auth_user_id", session.user.id)
             .maybeSingle();
 
           if (cgErr) {
-            console.warn("Error buscando cuidador por sesión:", cgErr);
-            setDebugMsg(
-              (prev) =>
-                prev + `\n⚠️ No pude mapear cuidador por auth_user_id: ${cgErr.message}`
-            );
+            setDebugMsg((prev) => prev + `\n⚠️ No pude leer cuidadores: ${cgErr.message}`);
           }
 
           if (cg?.id) {
             setCaregiverId(cg.id);
+            setCaregiverNombre((cg as any)?.nombre ?? "Cuidador");
             setDebugMsg((prev) => prev + `\n✅ cuidador_id: ${cg.id}`);
 
             const { data: assignments, error: asgErr } = await supabase
@@ -175,85 +161,74 @@ export default function DailyReportPage() {
               .limit(1);
 
             if (asgErr) {
-              console.warn("Error buscando asignación:", asgErr);
               setDebugMsg((prev) => prev + `\n⚠️ Error asignación: ${asgErr.message}`);
             }
 
             if (assignments?.length) {
               setAdultoId(assignments[0].adulto_id);
               setDebugMsg((prev) => prev + `\n✅ adulto_id (asignado): ${assignments[0].adulto_id}`);
-            } else {
-              setDebugMsg(
-                (prev) =>
-                  prev +
-                  `\n⚠️ No encontré asignaciones_cuidado para este cuidador (adulto_id queda vacío).`
-              );
             }
-          } else {
-            setDebugMsg(
-              (prev) =>
-                prev +
-                `\n❌ No encontré cuidador asociado a este usuario (tabla cuidadores.auth_user_id).`
-            );
           }
         }
 
-        // B) SIN sesión + DEMO: usar primer cuidador + primer adulto
-        if (!session && DEMO_MODE) {
-          setDebugMsg("🟡 DEMO_MODE activo: NO hay sesión. Tomando primer cuidador y primer adulto.");
-
-          const { data: fallbackCg, error: fcgErr } = await supabase
-            .from("cuidadores")
-            .select("id")
-            .order("id", { ascending: true })
-            .limit(1)
-            .maybeSingle();
+        // 2) Si no obtuvimos adulto_id, tomamos el primer adulto (demo o fallback)
+        if (!adultoId) {
+          if (!session && DEMO_MODE) {
+            setDebugMsg((prev) => prev + `\n🟡 DEMO_MODE activo: tomando primer adulto.`);
+          }
 
           const { data: fallbackAm, error: famErr } = await supabase
             .from("adultos_mayores")
-            .select("id")
+            .select("id, nombre")
             .order("id", { ascending: true })
             .limit(1)
             .maybeSingle();
 
-          if (fcgErr) setDebugMsg((prev) => prev + `\n⚠️ DEMO cuidadores error: ${fcgErr.message}`);
-          if (famErr) setDebugMsg((prev) => prev + `\n⚠️ DEMO adultos error: ${famErr.message}`);
-
-          if (fallbackCg?.id) {
-            setCaregiverId(fallbackCg.id);
-            setDebugMsg((prev) => prev + `\n✅ DEMO cuidador_id: ${fallbackCg.id}`);
-          } else {
-            setDebugMsg((prev) => prev + `\n❌ DEMO: no hay cuidadores en la tabla.`);
+          if (famErr) {
+            setDebugMsg((prev) => prev + `\n❌ Error leyendo adultos_mayores: ${famErr.message}`);
           }
 
           if (fallbackAm?.id) {
             setAdultoId(fallbackAm.id);
-            setDebugMsg((prev) => prev + `\n✅ DEMO adulto_id: ${fallbackAm.id}`);
+            setAdultoNombre((fallbackAm as any)?.nombre ?? "");
+            setDebugMsg((prev) => prev + `\n✅ adulto_id: ${fallbackAm.id}`);
           } else {
-            setDebugMsg((prev) => prev + `\n❌ DEMO: no hay adultos_mayores en la tabla.`);
+            setDebugMsg((prev) => prev + `\n❌ No hay adultos_mayores en la tabla.`);
           }
 
-          toast.info("Modo Demo activo", {
-            description: "Sin sesión. Se usarán perfiles de prueba.",
-          });
+          // Cuidador demo (texto), porque tu BD no usa cuidadores
+          if (DEMO_MODE) {
+            setCaregiverNombre("Cuidador Demo");
+            setDebugMsg((prev) => prev + `\n✅ cuidador_nombre (demo): Cuidador Demo`);
+            toast.info("Modo Demo activo", {
+              description: "Se usará un cuidador demo y el primer adulto para pruebas.",
+            });
+          } else if (!session) {
+            toast.error("Sesión no detectada", {
+              description: "Debes iniciar sesión o activar DEMO_MODE=true para enviar el reporte.",
+            });
+            setDebugMsg((prev) => prev + `\n❌ No hay sesión y DEMO_MODE está apagado.`);
+          }
         }
 
-        // C) SIN sesión y NO demo
-        if (!session && !DEMO_MODE) {
-          toast.error("Sesión no detectada", {
-            description: "Debes iniciar sesión para enviar el reporte.",
-          });
-          setDebugMsg("❌ No hay sesión. Inicia sesión o activa DEMO_MODE.");
+        // 3) Si ya tenemos adultoId pero no nombre, lo leemos
+        if (adultoId && !adultoNombre) {
+          const { data: adultoRow } = await supabase
+            .from("adultos_mayores")
+            .select("nombre")
+            .eq("id", adultoId)
+            .maybeSingle();
+          setAdultoNombre((adultoRow as any)?.nombre ?? "");
         }
       } catch (e: any) {
-        console.error("loadSessionAndIds error:", e);
-        setDebugMsg(`❌ Error inesperado en loadSessionAndIds: ${e?.message ?? String(e)}`);
+        setDebugMsg(`❌ Error inesperado: ${e?.message ?? String(e)}`);
       } finally {
         setLoading(false);
       }
     }
 
-    loadSessionAndIds();
+    loadIds();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handlePrev = () => {
@@ -271,98 +246,72 @@ export default function DailyReportPage() {
   };
 
   /**
-   * Inserta con fallback por esquema + errores explícitos
+   * Inserción adaptada a tu esquema real:
+   * - Tu tabla reportes_cuidador (según capturas) usa: adulto_id, tipo_reporte, contenido, cuidador_nombre (texto)
+   * - NO depende de cuidador_id
    */
-  async function insertWithFallback(payload: any) {
-    // 1) Intento estándar (respuestas jsonb)
+  async function insertReporteDiario() {
+    const fechaISO = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+
+    const contenido = {
+      respuestas: formData.respuestas,
+      notaCorta: formData.notaCorta || "—",
+      observaciones: formData.observaciones || "—",
+      fechaHoraLocal: formData.fechaHora,
+    };
+
+    // payload compatible con tu tabla actual
+    const payload: any = {
+      adulto_id: adultoId,
+      tipo_reporte: "diario",
+      contenido, // si la columna es json/jsonb en tu tabla, perfecto
+      cuidador_nombre: caregiverNombre || "Cuidador",
+      // NO mandamos cuidador_id para evitar fallos por columna inexistente o nulls
+    };
+
+    // Si tu columna "contenido" es TEXT en vez de JSON, guarda string:
+    // (esto no rompe si contenido es jsonb, PostgREST lo convertirá si puede)
+    // Si te da error luego, lo cambiamos a JSON.stringify(contenido)
     try {
-      const res = await supabase
-        .from("reportes_cuidador")
-        .insert(payload)
-        .select()
-        .throwOnError();
-
-      return { data: res.data, error: null };
+      const res = await supabase.from("reportes_cuidador").insert(payload).select();
+      return res;
     } catch (e: any) {
-      const msg = String(e?.message ?? e);
-      console.warn("[Insert estándar falló]", e);
-
-      // Solo hacemos fallback si parece ser por columna inexistente
-      const looksLikeMissingColumn =
-        msg.toLowerCase().includes("column") && msg.toLowerCase().includes("does not exist");
-
-      if (!looksLikeMissingColumn) {
-        return { data: null, error: { message: msg } };
-      }
-
-      // 2) Fallback: guardar en contenido/notas (texto)
-      const fallbackPayload: any = {
-        adulto_id: payload.adulto_id,
-        cuidador_id: payload.cuidador_id,
-        tipo_reporte: payload.tipo_reporte ?? "diario",
-        fecha: payload.fecha,
-        contenido: JSON.stringify(payload.respuestas ?? {}),
-        notas: payload.notas ?? null,
-      };
-
-      try {
-        const res2 = await supabase
-          .from("reportes_cuidador")
-          .insert(fallbackPayload)
-          .select()
-          .throwOnError();
-
-        return { data: res2.data, error: null };
-      } catch (e2: any) {
-        const msg2 = String(e2?.message ?? e2);
-        console.warn("[Insert fallback falló]", e2);
-        return { data: null, error: { message: msg2 } };
-      }
+      return { data: null, error: { message: e?.message ?? String(e) } } as any;
     }
   }
 
   const handleSubmit = async () => {
     setDebugMsg((prev) => prev + "\n\n🟣 Intentando guardar reporte…");
-    console.log("click guardar reporte", { adultoId, caregiverId, DEMO_MODE });
 
-    if (!adultoId || !caregiverId) {
+    if (!adultoId) {
       toast.error("No se puede guardar el reporte", {
-        description:
-          "Falta identificar el cuidador o el adulto. Revisa debug abajo (asignación / sesión / demo).",
+        description: "Falta identificar el adulto. Revisa debug abajo.",
       });
-      setDebugMsg(
-        (prev) =>
-          prev +
-          `\n❌ No puedo guardar: adultoId=${adultoId ?? "null"} caregiverId=${
-            caregiverId ?? "null"
-          }`
-      );
+      setDebugMsg((prev) => prev + `\n❌ adultoId=null`);
       return;
+    }
+
+    // Si no hay sesión y DEMO_MODE está apagado, no guardamos
+    if (!DEMO_MODE) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
+      if (!session) {
+        toast.error("Sesión no detectada", {
+          description: "Activa DEMO_MODE=true o inicia sesión.",
+        });
+        setDebugMsg((prev) => prev + `\n❌ No session y DEMO_MODE=false`);
+        return;
+      }
     }
 
     setSaving(true);
 
     try {
-      const fechaISO = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
+      const result = await insertReporteDiario();
 
-      const notasFinal =
-        `Nota corta: ${formData.notaCorta || "—"}\n` +
-        `Observaciones: ${formData.observaciones || "—"}`;
-
-      const payload = {
-        adulto_id: adultoId,
-        cuidador_id: caregiverId,
-        tipo_reporte: "diario",
-        fecha: fechaISO,
-        respuestas: formData.respuestas,
-        notas: notasFinal,
-      };
-
-      setDebugMsg((prev) => prev + `\n📦 Payload listo (fecha=${fechaISO})`);
-
-      const result = await insertWithFallback(payload);
-
-      if (result.error) {
+      if (result?.error) {
         toast.error("No se pudo guardar el reporte", {
           description: result.error.message,
         });
@@ -370,40 +319,18 @@ export default function DailyReportPage() {
         return;
       }
 
-      setDebugMsg((prev) => prev + `\n✅ Guardado OK. Filas insertadas: ${result.data?.length ?? 0}`);
+      setDebugMsg((prev) => prev + `\n✅ Guardado OK. Filas: ${result.data?.length ?? 0}`);
+      toast.success("Reporte guardado", { description: "Redirigiendo…" });
 
-      // Buscar nombre para success
-      const { data: adultoRow, error: adultoErr } = await supabase
-        .from("adultos_mayores")
-        .select("nombre")
-        .eq("id", adultoId)
-        .maybeSingle();
-
-      if (adultoErr) {
-        console.warn("No pude leer nombre del adulto:", adultoErr);
-        setDebugMsg((prev) => prev + `\n⚠️ No pude leer nombre del adulto: ${adultoErr.message}`);
-      }
-
-      const adultoNombre = adultoRow?.nombre ?? "";
-      toast.success("Reporte guardado", { description: "Redirigiendo a confirmación…" });
-
-      router.push(
-        `/care/report/daily/success?adulto=${encodeURIComponent(adultoNombre)}`
-      );
+      router.push(`/care/report/daily/success?adulto=${encodeURIComponent(adultoNombre || "")}`);
     } catch (e: any) {
-      console.error("Unexpected error:", e);
-      toast.error("Error inesperado al guardar el reporte", {
-        description: e?.message ?? "Revisa consola",
-      });
-      setDebugMsg((prev) => prev + `\n❌ ERROR inesperado: ${e?.message ?? String(e)}`);
+      toast.error("Error inesperado al guardar", { description: e?.message ?? "Revisa consola" });
+      setDebugMsg((prev) => prev + `\n❌ ERROR: ${e?.message ?? String(e)}`);
     } finally {
       setSaving(false);
     }
   };
 
-  /**
-   * Render de secciones por StepKey
-   */
   const renderFields = (k: StepKey) => {
     const v = (field: string) => (formData.respuestas[k] as any)?.[field];
     const set = (field: string, value: unknown) => updateStepData(k, field, value);
@@ -632,7 +559,6 @@ export default function DailyReportPage() {
               onChange={(val) => set("interaccion", val)}
               options={["Normal", "Más callado", "Agitado", "No quiso hablar"]}
             />
-            {/* AQUÍ QUEDAN Ansiedad y Estrés con escala clara */}
             <Select
               label="Ansiedad (1–5)"
               value={(v("ansiedad") as string | undefined) ?? ""}
@@ -694,9 +620,6 @@ export default function DailyReportPage() {
         <div className="max-w-3xl mx-auto">
           <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
             <p className="text-slate-700">Cargando reporte…</p>
-            <p className="text-sm text-slate-500 mt-2">
-              Verificando sesión / demo / asignación.
-            </p>
           </div>
         </div>
       </div>
@@ -706,12 +629,9 @@ export default function DailyReportPage() {
   return (
     <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-3xl mx-auto space-y-6">
-        {/* Header */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h1 className="text-2xl font-semibold text-slate-900">Reporte diario</h1>
-          <p className="text-sm text-slate-600 mt-1">
-            Completa el reporte en 3 pasos. Al final podrás agregar nota y observaciones.
-          </p>
+          <p className="text-sm text-slate-600 mt-1">Completa el reporte en 3 pasos.</p>
 
           <div className="mt-4">
             <ProgressBar value={Math.round(((groupIndex + 1) / stepGroups.length) * 100)} />
@@ -724,7 +644,6 @@ export default function DailyReportPage() {
           </div>
         </div>
 
-        {/* Grupo */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm">
           <h2 className="text-xl font-semibold text-slate-900">{currentGroup.title}</h2>
           <p className="text-sm text-slate-600 mt-1">{currentGroup.subtitle}</p>
@@ -778,15 +697,16 @@ export default function DailyReportPage() {
             </button>
           </div>
 
-          {/* DEBUG: esto te dirá EXACTAMENTE por qué no guarda */}
           <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <p className="text-xs font-semibold text-slate-700 mb-2">DEBUG (no se sube a producción si no quieres)</p>
+            <p className="text-xs font-semibold text-slate-700 mb-2">DEBUG</p>
             <pre className="text-xs text-slate-700 whitespace-pre-wrap">
 {`DEMO_MODE: ${DEMO_MODE}
 adultoId: ${adultoId ?? "null"}
+adultoNombre: ${adultoNombre || "—"}
 caregiverId: ${caregiverId ?? "null"}
+caregiverNombre: ${caregiverNombre || "—"}
 
-${debugMsg || "(sin debug aún)"}
+${debugMsg || "(sin debug)"}
 `}
             </pre>
           </div>
@@ -796,9 +716,7 @@ ${debugMsg || "(sin debug aún)"}
   );
 }
 
-/* -------------------------
-   Componentes UI (locales)
-------------------------- */
+/* UI */
 
 function SectionCard({
   title,
