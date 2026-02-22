@@ -18,17 +18,6 @@ export default function Home() {
               alt="Red Viva"
               style={{ height: "280px", width: "auto" }}
               className="drop-shadow-[0_20px_50px_rgba(37,99,235,0.2)] object-contain -ml-4"
-              onError={(e) => {
-                e.currentTarget.style.display = "none";
-                const parent = e.currentTarget.parentElement;
-                if (parent) {
-                  const fallback = document.createElement("div");
-                  fallback.className =
-                    "text-7xl font-black text-blue-900 flex items-center gap-2 mb-4";
-                  fallback.innerHTML = "<span>Red Viva</span>";
-                  parent.appendChild(fallback);
-                }
-              }}
             />
             <span className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-blue-100 border border-blue-200 text-xs font-black text-blue-700 uppercase tracking-[0.2em] shadow-sm ml-4">
               Tecnología para la Vida
@@ -113,9 +102,7 @@ function RoleCard({
           alt={title}
           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
         />
-
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
-        <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
       </div>
 
       <div className="relative z-10 p-10 flex flex-col h-full">
