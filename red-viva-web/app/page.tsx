@@ -44,8 +44,7 @@ export default function Home() {
             Cuidado ético con <span className="text-primary italic">propósito.</span>
           </h1>
           <p className="text-xl text-slate-500 font-medium leading-relaxed">
-            Bienvenido al ecosistema Red Viva. Seleccione su portal para continuar con el
-            seguimiento interdisciplinario de calidad.
+            Bienvenido al ecosistema Red Viva ✅. Seleccione su portal para continuar con el seguimiento interdisciplinario de calidad.
           </p>
         </div>
 
