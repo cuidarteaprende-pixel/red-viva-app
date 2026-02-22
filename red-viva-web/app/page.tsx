@@ -146,7 +146,7 @@ function RoleCard({
 
         <div className="mt-auto">
           {/* ✅ panel “glass” detrás del texto */}
-          <div className="inline-block rounded-2xl bg-white/88 backdrop-blur-md px-5 py-4 shadow-lg ring-1 ring-black/5 max-w-[92%]">
+         <div className="inline-block rounded-2xl bg-white/65 backdrop-blur-sm px-5 py-4 shadow-lg ring-1 ring-black/5 max-w-[92%]">
             <span
               className={cn(
                 "text-[10px] font-black uppercase tracking-widest mb-2 block",
