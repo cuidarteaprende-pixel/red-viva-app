@@ -1,703 +1,155 @@
+/* eslint-disable @next/next/no-img-element */
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
-import { supabase } from "@/lib/supabase";
+import Link from "next/link";
+import { Heart, ShieldCheck, ArrowRight } from "lucide-react";
+import { cn } from "@/lib/utils";
 
-const DEMO_MODE = process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+export default function Home() {
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 selection:bg-primary/20 relative overflow-hidden">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_var(--tw-gradient-from),_transparent_40%)] from-primary/5 pointer-events-none" />
 
-type StepKey =
-  | "salud_fisica"
-  | "movilidad"
-  | "nutricion"
-  | "medicacion"
-  | "higiene_piel"
-  | "sueno"
-  | "cognicion_emocional"
-  | "entorno_cuidador";
+      <div className="w-full max-w-6xl space-y-12 z-10">
+        <header className="w-full flex flex-col md:flex-row items-center justify-between gap-8 mb-12">
+          <div className="flex flex-col items-start gap-4">
+            <img
+              src="/red-viva-logo.png"
+              alt="Red Viva"
+              style={{ height: "280px", width: "auto" }}
+              className="drop-shadow-[0_20px_50px_rgba(37,99,235,0.2)] object-contain -ml-4"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+                const parent = e.currentTarget.parentElement;
+                if (parent) {
+                  const fallback = document.createElement("div");
+                  fallback.className =
+                    "text-7xl font-black text-blue-900 flex items-center gap-2 mb-4";
+                  fallback.innerHTML = "<span>Red Viva</span>";
+                  parent.appendChild(fallback);
+                }
+              }}
+            />
+            <span className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-blue-100 border border-blue-200 text-xs font-black text-blue-700 uppercase tracking-[0.2em] shadow-sm ml-4">
+              Tecnología para la Vida
+            </span>
+          </div>
+        </header>
 
-type StepData = Record<string, unknown>;
-type Respuestas = Record<StepKey, StepData>;
+        <div className="text-center md:text-left max-w-3xl">
+          <h1 className="text-5xl md:text-7xl font-black text-slate-900 tracking-tight leading-none mb-6">
+            Cuidado ético con <span className="text-primary italic">propósito.</span>
+          </h1>
+          <p className="text-xl text-slate-500 font-medium leading-relaxed">
+            Bienvenido al ecosistema Red Viva. Seleccione su portal para continuar con el
+            seguimiento interdisciplinario de calidad.
+          </p>
+        </div>
 
-type StepGroup = {
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <RoleCard
+            href="/cuidador"
+            title="Portal Cuidador"
+            subtitle="Registrar Reporte Diario"
+            description="Bitácora 360°, registro de signos vitales, alimentación y avisos de eventos críticos."
+            icon={<Heart className="w-8 h-8 text-rose-500" />}
+            image="https://images.pexels.com/photos/3791664/pexels-photo-3791664.jpeg?auto=compress&cs=tinysrgb&w=1200"
+            color="rose"
+          />
+
+          <RoleCard
+            href="/dashboard-profesional"
+            title="Portal Profesional"
+            subtitle="Análisis y Gestión Interdisciplinaria"
+            description="Dashboard clínico, KPIs en tiempo real, validación de casos y trazabilidad ética."
+            icon={<ShieldCheck className="w-8 h-8 text-blue-600" />}
+            image="https://images.pexels.com/photos/4173251/pexels-photo-4173251.jpeg?auto=compress&cs=tinysrgb&w=1200"
+            color="blue"
+          />
+        </div>
+
+        <footer className="pt-12 border-t border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 text-[10px] font-black uppercase tracking-widest text-slate-400">
+          <span>&copy; {new Date().getFullYear()} Red Viva • Todos los derechos reservados</span>
+          <div className="flex gap-6">
+            <span className="text-slate-900">WCAG AA Compliant</span>
+            <span className="text-slate-900">Blockchain Traceability</span>
+          </div>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+function RoleCard({
+  href,
+  title,
+  subtitle,
+  description,
+  icon,
+  image,
+  color,
+}: {
+  href: string;
   title: string;
   subtitle: string;
-  keys: StepKey[];
-};
-
-type FormData = {
-  fechaHora: string;
-  respuestas: Respuestas;
-  notaCorta: string;
-  observaciones: string;
-};
-
-type DbAdulto = { id: string; nombre: string | null };
-
-function nowIsoLocal(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
-    d.getHours()
-  )}:${pad(d.getMinutes())}`;
-}
-
-function ensureRespuestas(): Respuestas {
-  return {
-    salud_fisica: {},
-    movilidad: {},
-    nutricion: {},
-    medicacion: {},
-    higiene_piel: {},
-    sueno: {},
-    cognicion_emocional: {},
-    entorno_cuidador: {},
-  };
-}
-
-const SCALE_1_5 = [
-  "1 — Nada",
-  "2 — Leve",
-  "3 — Moderado",
-  "4 — Alto",
-  "5 — Muy alto",
-];
-
-const BG_IMG =
-  "https://images.pexels.com/photos/3791664/pexels-photo-3791664.jpeg?auto=compress&cs=tinysrgb&w=1920";
-
-export default function DailyReportPage() {
-  const router = useRouter();
-
-  const stepGroups: StepGroup[] = useMemo(
-    () => [
-      {
-        title: "Chequeo físico",
-        subtitle: "Salud, movilidad y nutrición",
-        keys: ["salud_fisica", "movilidad", "nutricion"],
-      },
-      {
-        title: "Rutina y cuidado",
-        subtitle: "Medicación, higiene/piel y sueño",
-        keys: ["medicacion", "higiene_piel", "sueno"],
-      },
-      {
-        title: "Cognición y entorno",
-        subtitle: "Emoción, entorno y cierre",
-        keys: ["cognicion_emocional", "entorno_cuidador"],
-      },
-    ],
-    []
-  );
-
-  const [groupIndex, setGroupIndex] = useState(0);
-  const isLastGroup = groupIndex === stepGroups.length - 1;
-  const currentGroup = stepGroups[groupIndex];
-
-  const [adultoId, setAdultoId] = useState<string | null>(null);
-  const [adultoNombre, setAdultoNombre] = useState<string>("");
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
-  const [formData, setFormData] = useState<FormData>({
-    fechaHora: nowIsoLocal(),
-    respuestas: ensureRespuestas(),
-    notaCorta: "",
-    observaciones: "",
-  });
-
-  const updateStepData = (stepKey: StepKey, field: string, value: unknown) => {
-    setFormData((prev) => ({
-      ...prev,
-      respuestas: {
-        ...prev.respuestas,
-        [stepKey]: {
-          ...(prev.respuestas[stepKey] ?? {}),
-          [field]: value,
-        },
-      },
-    }));
-  };
-
-  // Cargar adulto (demo estable): primer adulto_mayor
-  useEffect(() => {
-    async function loadAdulto() {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        // Si no hay sesión y no demo, igual cargamos adulto (para demo jurado),
-        // pero mostramos aviso.
-        if (!session && !DEMO_MODE) {
-          toast.info("Modo sin sesión", {
-            description:
-              "No hay sesión detectada. Si quieres forzar demo en producción, activa NEXT_PUBLIC_DEMO_MODE=true en Vercel.",
-          });
-        }
-
-        const { data: am, error } = await supabase
-          .from("adultos_mayores")
-          .select("id,nombre")
-          .order("id", { ascending: true })
-          .limit(1)
-          .maybeSingle<DbAdulto>();
-
-        if (error) {
-          toast.error("No pude cargar adulto mayor", { description: error.message });
-          return;
-        }
-
-        if (am?.id) {
-          setAdultoId(am.id);
-          setAdultoNombre(am.nombre ?? "");
-        } else {
-          toast.error("No hay adultos mayores", {
-            description: "Crea al menos 1 registro en adultos_mayores.",
-          });
-        }
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadAdulto();
-  }, []);
-
-  const handlePrev = () => {
-    setGroupIndex((i) => Math.max(0, i - 1));
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
-
-  const handleNext = async () => {
-    if (groupIndex < stepGroups.length - 1) {
-      setGroupIndex((i) => i + 1);
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      return;
-    }
-    await handleSubmit();
-  };
-
-  async function insertReporteDiario() {
-    if (!adultoId) throw new Error("adultoId null");
-
-    const contenido: Record<string, unknown> = {
-      respuestas: formData.respuestas,
-      notaCorta: formData.notaCorta || "—",
-      observaciones: formData.observaciones || "—",
-      fechaHoraLocal: formData.fechaHora,
-    };
-
-    const payload: Record<string, unknown> = {
-      adulto_id: adultoId,
-      tipo_reporte: "diario",
-      contenido,
-      cuidador_nombre: DEMO_MODE ? "Cuidador Demo" : "Cuidador",
-    };
-
-    const { data, error } = await supabase.from("reportes_cuidador").insert(payload).select();
-    if (error) throw new Error(error.message);
-    return data;
-  }
-
-  const handleSubmit = async () => {
-    if (!adultoId) {
-      toast.error("No se puede guardar el reporte", {
-        description: "Falta identificar el adulto.",
-      });
-      return;
-    }
-
-    setSaving(true);
-    try {
-      await insertReporteDiario();
-      toast.success("Reporte guardado", { description: "Redirigiendo…" });
-      router.push(`/care/report/daily/success?adulto=${encodeURIComponent(adultoNombre || "")}`);
-    } catch (e) {
-      toast.error("No se pudo guardar", { description: String(e) });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const renderFields = (k: StepKey) => {
-    const step = formData.respuestas[k];
-    const getVal = (field: string) => step?.[field];
-    const set = (field: string, value: unknown) => updateStepData(k, field, value);
-
-    switch (k) {
-      case "salud_fisica":
-        return (
-          <SectionCard title="Salud física y signos" subtitle="Dolor, fiebre, respiración, energía">
-            <Select
-              label="Dolor"
-              value={(getVal("dolor") as string | undefined) ?? ""}
-              onChange={(val) => set("dolor", val)}
-              options={["Nada", "Leve", "Moderado", "Fuerte", "10/10"]}
-            />
-            <YesNo
-              label="¿Fiebre o sensación de fiebre?"
-              value={(getVal("fiebre") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("fiebre", val)}
-            />
-            <Select
-              label="Respiración"
-              value={(getVal("respiracion") as string | undefined) ?? ""}
-              onChange={(val) => set("respiracion", val)}
-              options={["Normal", "Agitada", "Tos fuerte"]}
-            />
-            <Select
-              label="Energía"
-              value={(getVal("energia") as string | undefined) ?? ""}
-              onChange={(val) => set("energia", val)}
-              options={["Baja 😴", "Media 🙂", "Alta 😃"]}
-            />
-            <Select
-              label="Síntomas nuevos hoy"
-              value={(getVal("sintomas") as string | undefined) ?? ""}
-              onChange={(val) => set("sintomas", val)}
-              options={["Ninguno", "Mareo", "Náuseas", "Diarrea", "Estreñimiento", "Otro"]}
-            />
-          </SectionCard>
-        );
-
-      case "movilidad":
-        return (
-          <SectionCard title="Movilidad y riesgo de caídas" subtitle="Marcha, equilibrio, caídas o casi caídas">
-            <Select
-              label="¿Caminó hoy?"
-              value={(getVal("camino") as string | undefined) ?? ""}
-              onChange={(val) => set("camino", val)}
-              options={["Sí sin ayuda", "Con ayuda", "No"]}
-            />
-            <Select
-              label="Equilibrio"
-              value={(getVal("equilibrio") as string | undefined) ?? ""}
-              onChange={(val) => set("equilibrio", val)}
-              options={["🟢 Bien", "🟡 Inestable", "🔴 Muy inestable"]}
-            />
-            <Select
-              label="¿Hubo caída o casi caída?"
-              value={(getVal("caida") as string | undefined) ?? ""}
-              onChange={(val) => set("caida", val)}
-              options={["No", "Casi cae", "Sí cayó"]}
-            />
-            <YesNo
-              label="¿Dolor al moverse?"
-              value={(getVal("dolor_movimiento") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("dolor_movimiento", val)}
-            />
-          </SectionCard>
-        );
-
-      case "nutricion":
-        return (
-          <SectionCard title="Nutrición e hidratación" subtitle="Comidas, líquidos, evacuación y señales">
-            <Select
-              label="Comió"
-              value={(getVal("comio") as string | undefined) ?? ""}
-              onChange={(val) => set("comio", val)}
-              options={["Bien", "Poco", "Nada"]}
-            />
-            <Select
-              label="Tomó líquidos"
-              value={(getVal("liquidos") as string | undefined) ?? ""}
-              onChange={(val) => set("liquidos", val)}
-              options={["Bien", "Poco", "Nada"]}
-            />
-            <YesNo
-              label="¿Náuseas o vómito?"
-              value={(getVal("vomito") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("vomito", val)}
-            />
-            <Select
-              label="Evacuación"
-              value={(getVal("evacuacion") as string | undefined) ?? ""}
-              onChange={(val) => set("evacuacion", val)}
-              options={["Normal", "Estreñimiento", "Diarrea", "No hizo"]}
-            />
-            <Input
-              label="Señales de deshidratación (opcional)"
-              value={(getVal("deshidratacion") as string | undefined) ?? ""}
-              onChange={(val) => set("deshidratacion", val)}
-              placeholder="boca seca / orina muy amarilla / mareo…"
-            />
-          </SectionCard>
-        );
-
-      case "medicacion":
-        return (
-          <SectionCard title="Medicación" subtitle="Adherencia, olvidos y efectos">
-            <Select
-              label="¿Tomó medicamentos como se indicó?"
-              value={(getVal("adherencia") as string | undefined) ?? ""}
-              onChange={(val) => set("adherencia", val)}
-              options={["Sí", "Parcial", "No"]}
-            />
-            <YesNo
-              label="¿Se olvidó alguna dosis?"
-              value={(getVal("olvido") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("olvido", val)}
-            />
-            <Select
-              label="¿Efectos secundarios?"
-              value={(getVal("efectos") as string | undefined) ?? ""}
-              onChange={(val) => set("efectos", val)}
-              options={["No", "Sueño excesivo", "Mareo", "Dolor estómago", "Otro"]}
-            />
-            <Input
-              label="Lista rápida (opcional)"
-              value={(getVal("lista") as string | undefined) ?? ""}
-              onChange={(val) => set("lista", val)}
-              placeholder="Medicamento – hora (ej: Losartán 8:00am)"
-            />
-          </SectionCard>
-        );
-
-      case "higiene_piel":
-        return (
-          <SectionCard title="Higiene, piel e incontinencia" subtitle="Integridad de piel, lesiones y cuidado">
-            <Select
-              label="Higiene"
-              value={(getVal("higiene") as string | undefined) ?? ""}
-              onChange={(val) => set("higiene", val)}
-              options={["Completa", "Parcial", "No se pudo"]}
-            />
-            <Select
-              label="Piel"
-              value={(getVal("piel") as string | undefined) ?? ""}
-              onChange={(val) => set("piel", val)}
-              options={["🟢 Bien", "🟡 Enrojecida", "🔴 Herida o llaga"]}
-            />
-            <YesNo
-              label="¿Hay incontinencia hoy?"
-              value={(getVal("incontinencia") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("incontinencia", val)}
-            />
-            <Input
-              label="Observaciones (opcional)"
-              value={(getVal("observaciones_piel") as string | undefined) ?? ""}
-              onChange={(val) => set("observaciones_piel", val)}
-              placeholder="Ej: enrojecimiento leve, aplicar crema…"
-            />
-          </SectionCard>
-        );
-
-      case "sueno":
-        return (
-          <SectionCard title="Sueño" subtitle="Calidad, despertares y descanso">
-            <Select
-              label="Calidad del sueño"
-              value={(getVal("calidad") as string | undefined) ?? ""}
-              onChange={(val) => set("calidad", val)}
-              options={["Buena", "Regular", "Mala"]}
-            />
-            <YesNo
-              label="¿Se despertó varias veces?"
-              value={(getVal("despertares") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("despertares", val)}
-            />
-            <Input
-              label="Observaciones (opcional)"
-              value={(getVal("observaciones_sueno") as string | undefined) ?? ""}
-              onChange={(val) => set("observaciones_sueno", val)}
-              placeholder="Ej: ronquidos, dolor nocturno…"
-            />
-          </SectionCard>
-        );
-
-      case "cognicion_emocional":
-        return (
-          <SectionCard title="Cognición y estado emocional" subtitle="Ánimo, orientación y conducta">
-            <Select
-              label="Estado de ánimo"
-              value={(getVal("animo") as string | undefined) ?? ""}
-              onChange={(val) => set("animo", val)}
-              options={["🙂 Bien", "😐 Neutro", "😟 Triste", "😠 Irritable", "😰 Ansioso"]}
-            />
-            <YesNo
-              label="¿Hubo confusión o desorientación?"
-              value={(getVal("confusion") as boolean | null | undefined) ?? null}
-              onChange={(val) => set("confusion", val)}
-            />
-            <Select
-              label="Ansiedad (1–5)"
-              value={(getVal("ansiedad") as string | undefined) ?? ""}
-              onChange={(val) => set("ansiedad", val)}
-              options={SCALE_1_5}
-            />
-            <Select
-              label="Estrés (1–5)"
-              value={(getVal("estres") as string | undefined) ?? ""}
-              onChange={(val) => set("estres", val)}
-              options={SCALE_1_5}
-            />
-          </SectionCard>
-        );
-
-      case "entorno_cuidador":
-        return (
-          <SectionCard title="Entorno y cuidador" subtitle="Seguridad del entorno y carga del cuidador">
-            <Select
-              label="Entorno"
-              value={(getVal("entorno") as string | undefined) ?? ""}
-              onChange={(val) => set("entorno", val)}
-              options={["Seguro", "Con riesgos", "No evaluado"]}
-            />
-            <Select
-              label="Carga del cuidador (1–5)"
-              value={(getVal("carga") as string | undefined) ?? ""}
-              onChange={(val) => set("carga", val)}
-              options={SCALE_1_5}
-            />
-            <Input
-              label="Nota final del cuidador (opcional)"
-              value={(getVal("nota") as string | undefined) ?? ""}
-              onChange={(val) => set("nota", val)}
-              placeholder="Ej: hoy fue difícil por…, necesito apoyo en…"
-            />
-          </SectionCard>
-        );
-
-      default:
-        return null;
-    }
-  };
-
-  if (loading) {
-    return (
-      <main className="min-h-screen bg-slate-50 p-6">
-        <div className="mx-auto max-w-3xl rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-slate-700">Cargando reporte…</p>
-        </div>
-      </main>
-    );
-  }
-
+  description: string;
+  icon: React.ReactNode;
+  image: string;
+  color: "rose" | "blue";
+}) {
   return (
-    <main className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Fondo tenue (tipo profesionales) */}
-      <div className="fixed inset-0 -z-10 opacity-18 pointer-events-none">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={BG_IMG} alt="Care background" className="w-full h-full object-cover" />
+    <Link
+      href={href}
+      className={cn(
+        "group relative block h-full min-h-[420px] rounded-[2.5rem] overflow-hidden",
+        "border border-slate-200/70 bg-white shadow-xl shadow-slate-200/50",
+        "transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl active:scale-[0.99]",
+        "focus-visible:ring-4 focus-visible:ring-primary/20 outline-none"
+      )}
+    >
+      <div className="absolute inset-0">
+        <img
+          src={image}
+          alt={title}
+          className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+        />
+
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+        <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
       </div>
-      <div className="fixed inset-0 -z-10 bg-gradient-to-b from-white/85 via-white/75 to-white/90" />
 
-      <div className="mx-auto max-w-3xl p-6 space-y-6">
-        <div className="rounded-[2rem] border border-slate-200/70 bg-white/80 backdrop-blur-md p-6 shadow-[0_18px_55px_rgba(2,6,23,0.06)]">
-          <h1 className="text-2xl font-black text-slate-900">Reporte diario</h1>
-          <p className="text-sm text-slate-600 font-medium mt-1">Completa el reporte en 3 pasos.</p>
+      <div className="relative z-10 p-10 flex flex-col h-full">
+        <div className="w-16 h-16 rounded-2xl bg-white/90 backdrop-blur-sm flex items-center justify-center mb-6 shadow-lg transition-transform group-hover:scale-110">
+          {icon}
+        </div>
 
-          <div className="mt-4">
-            <ProgressBar value={Math.round(((groupIndex + 1) / stepGroups.length) * 100)} />
-            <div className="mt-2 flex items-center justify-between text-xs text-slate-500 font-bold">
-              <span>
-                Paso {groupIndex + 1} de {stepGroups.length}
-              </span>
-              <span>{currentGroup.title}</span>
+        <div className="mt-auto">
+          <div className="inline-block rounded-2xl bg-white/50 backdrop-blur-sm px-5 py-4 shadow-lg ring-1 ring-black/5 max-w-[92%]">
+            <span
+              className={cn(
+                "text-[10px] font-black uppercase tracking-widest mb-2 block",
+                color === "rose" ? "text-rose-600" : "text-blue-600"
+              )}
+            >
+              {subtitle}
+            </span>
+
+            <h2 className="text-4xl font-black text-slate-900 mb-3 tracking-tight leading-tight">
+              {title}
+            </h2>
+
+            <p className="text-slate-800 font-medium text-base leading-relaxed mb-5 max-w-sm">
+              {description}
+            </p>
+
+            <div className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-slate-900 group-hover:gap-4 transition-all">
+              Ingresar Ahora <ArrowRight className="w-4 h-4" />
             </div>
           </div>
         </div>
-
-        <div className="rounded-[2rem] border border-slate-200/70 bg-white/80 backdrop-blur-md p-6 shadow-[0_18px_55px_rgba(2,6,23,0.06)]">
-          <h2 className="text-xl font-black text-slate-900">{currentGroup.title}</h2>
-          <p className="text-sm text-slate-600 font-medium mt-1">{currentGroup.subtitle}</p>
-
-          <div className="mt-6 space-y-5">
-            {currentGroup.keys.map((k) => (
-              <div key={k}>{renderFields(k)}</div>
-            ))}
-
-            {isLastGroup ? (
-              <SectionCard title="Cierre" subtitle="Notas finales del reporte">
-                <Textarea
-                  label="Nota corta (opcional)"
-                  value={formData.notaCorta}
-                  onChange={(val) => setFormData((p) => ({ ...p, notaCorta: val }))}
-                  placeholder="Ej: hoy estuvo más cansado de lo normal…"
-                />
-                <Textarea
-                  label="Observaciones (opcional)"
-                  value={formData.observaciones}
-                  onChange={(val) => setFormData((p) => ({ ...p, observaciones: val }))}
-                  placeholder="Ej: vigilar hidratación, contactar profesional si…"
-                />
-              </SectionCard>
-            ) : null}
-          </div>
-
-          <div className="mt-6 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={handlePrev}
-              disabled={groupIndex === 0 || saving}
-              className="px-5 py-3 rounded-2xl border border-slate-200 bg-white text-slate-900 font-black disabled:opacity-50 hover:bg-slate-50"
-            >
-              Atrás
-            </button>
-
-            <button
-              type="button"
-              onClick={handleNext}
-              disabled={saving}
-              className="px-6 py-3 rounded-2xl bg-emerald-600 text-white font-black shadow-lg shadow-emerald-600/20 disabled:opacity-50 hover:bg-emerald-700"
-            >
-              {groupIndex < stepGroups.length - 1 ? "Siguiente" : saving ? "Guardando…" : "Guardar reporte"}
-            </button>
-          </div>
-        </div>
       </div>
-    </main>
-  );
-}
 
-/* UI */
-
-function SectionCard({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="relative overflow-hidden rounded-[2rem] border border-slate-200/70 bg-white/80 backdrop-blur-md p-6 shadow-[0_18px_55px_rgba(2,6,23,0.06)]">
-      <div className="absolute -right-20 -top-20 h-56 w-56 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-      <div className="relative">
-        <h3 className="text-lg font-black text-slate-900">{title}</h3>
-        {subtitle ? <p className="text-sm text-slate-600 font-medium mt-1">{subtitle}</p> : null}
-        <div className="mt-5 space-y-5">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-function ProgressBar({ value }: { value: number }) {
-  const v = Math.max(0, Math.min(100, value));
-  return (
-    <div className="w-full h-2.5 rounded-full bg-slate-200/80 overflow-hidden">
-      <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-700" style={{ width: `${v}%` }} />
-    </div>
-  );
-}
-
-function Select({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-black text-slate-700">{label}</span>
-      <select
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition-all focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-400"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        <option value="">Selecciona…</option>
-        {options.map((opt) => (
-          <option key={opt} value={opt}>
-            {opt}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
-
-function YesNo({
-  label,
-  value,
-  onChange,
-}: {
-  label: string;
-  value: boolean | null;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="text-sm font-black text-slate-700">{label}</p>
-      <div className="flex gap-2">
-        <button
-          type="button"
-          className={`px-5 py-3 rounded-2xl border font-black text-sm transition-all active:scale-[0.98] ${
-            value === true
-              ? "bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-600/20"
-              : "bg-white border-slate-200 text-slate-900 hover:bg-slate-50"
-          }`}
-          onClick={() => onChange(true)}
-        >
-          Sí
-        </button>
-        <button
-          type="button"
-          className={`px-5 py-3 rounded-2xl border font-black text-sm transition-all active:scale-[0.98] ${
-            value === false
-              ? "bg-slate-900 border-slate-900 text-white shadow-lg shadow-slate-900/10"
-              : "bg-white border-slate-200 text-slate-900 hover:bg-slate-50"
-          }`}
-          onClick={() => onChange(false)}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function Input({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-black text-slate-700">{label}</span>
-      <input
-        className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition-all focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-400"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
-  );
-}
-
-function Textarea({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="text-sm font-black text-slate-700">{label}</span>
-      <textarea
-        className="w-full min-h-[120px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-slate-900 shadow-sm outline-none transition-all focus:ring-4 focus:ring-emerald-500/20 focus:border-emerald-400"
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-    </label>
+      <div className={cn("absolute bottom-0 left-0 right-0 h-2", color === "rose" ? "bg-rose-500" : "bg-blue-600")} />
+    </Link>
   );
 }
