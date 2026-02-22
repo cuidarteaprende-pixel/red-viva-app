@@ -51,6 +51,7 @@ export default function Home() {
 
         {/* Roles Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {/* Card Cuidador */}
           <RoleCard
             href="/cuidador"
             title="Portal Cuidador"
@@ -61,6 +62,7 @@ export default function Home() {
             color="rose"
           />
 
+          {/* Card Profesional */}
           <RoleCard
             href="/dashboard-profesional"
             title="Portal Profesional"
@@ -131,22 +133,23 @@ function RoleCard({
           }}
         />
 
-        {/* ✅ overlay fuerte: asegura legibilidad SIEMPRE */}
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        {/* ✅ Overlay menos fuerte para que la foto se vea más */}
+        <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
 
-        {/* highlight sutil */}
+        {/* Vignette sutil */}
         <div className="absolute inset-0 ring-1 ring-inset ring-white/10" />
       </div>
 
       {/* Content */}
       <div className="relative z-10 p-10 flex flex-col h-full">
-        <div className="w-16 h-16 rounded-2xl bg-white/90 backdrop-blur-md flex items-center justify-center mb-6 shadow-lg transition-transform group-hover:scale-110">
+        {/* Icon */}
+        <div className="w-16 h-16 rounded-2xl bg-white/90 backdrop-blur-sm flex items-center justify-center mb-6 shadow-lg transition-transform group-hover:scale-110">
           {icon}
         </div>
 
         <div className="mt-auto">
-          {/* ✅ panel “glass” detrás del texto */}
-         <div className="inline-block rounded-2xl bg-white/65 backdrop-blur-sm px-5 py-4 shadow-lg ring-1 ring-black/5 max-w-[92%]">
+          {/* ✅ Panel MÁS transparente para no tapar la imagen */}
+          <div className="inline-block rounded-2xl bg-white/50 backdrop-blur-sm px-5 py-4 shadow-lg ring-1 ring-black/5 max-w-[92%]">
             <span
               className={cn(
                 "text-[10px] font-black uppercase tracking-widest mb-2 block",
@@ -160,7 +163,7 @@ function RoleCard({
               {title}
             </h2>
 
-            <p className="text-slate-700 font-medium text-base leading-relaxed mb-5 max-w-sm">
+            <p className="text-slate-800 font-medium text-base leading-relaxed mb-5 max-w-sm">
               {description}
             </p>
 
@@ -171,6 +174,7 @@ function RoleCard({
         </div>
       </div>
 
+      {/* Accent */}
       <div
         className={cn(
           "absolute bottom-0 left-0 right-0 h-2",
